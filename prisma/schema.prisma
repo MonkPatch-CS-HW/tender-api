@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:postgres@localhost:5432"
+}
+
+model employee {
+  id                      String                    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  username                String                    @unique @db.VarChar(50)
+  firstName               String?                   @map("first_name") @db.VarChar(50)
+  lastName                String?                   @map("last_name") @db.VarChar(50)
+  createdAt               DateTime?                 @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt               DateTime?                 @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  organizationResponsible organizationResponsible[]
+}
+
+model organization {
+  id                      String                    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                    String                    @db.VarChar(100)
+  description             String?
+  type                    organizationType?
+  createdAt               DateTime?                 @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt               DateTime?                 @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  organizationResponsible organizationResponsible[]
+}
+
+model organizationResponsible {
+  id             String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  organizationId String?       @map("organization_id") @db.Uuid
+  userId         String?       @map("user_id") @db.Uuid
+  organization   organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employee       employee?     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("organization_responsible")
+}
+
+enum organizationType {
+  IE
+  LLC
+  JSC
+
+  @@map("organization_type")
+}
