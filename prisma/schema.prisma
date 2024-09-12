@@ -41,33 +41,33 @@ model organizationResponsible {
 }
 
 model bid {
-  id           String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  name         String         @db.VarChar(100)
-  description  String?
-  status       bidStatus?
-  tenderId     String?        @map("tender_id") @db.Uuid
-  tender       tender?        @relation(fields: [tenderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  authorType   bidAuthorType? @map("author_type")
-  authorId     String?        @map("author_id") @db.Uuid
-  organization organization?  @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "bid_organization_fkey")
-  employee     employee?      @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "bid_employee_fkey")
-  version      Int            @default(1)
-  createdAt    DateTime?      @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt    DateTime?      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  id           String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name         String        @db.VarChar(100)
+  description  String        @default("")
+  status       bidStatus     @default(Created)
+  tenderId     String        @map("tender_id") @db.Uuid
+  tender       tender        @relation(fields: [tenderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  authorType   bidAuthorType @map("author_type")
+  authorId     String        @map("author_id") @db.Uuid
+  organization organization? @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "bid_organization_fkey")
+  employee     employee?     @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "bid_employee_fkey")
+  version      Int           @default(1)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 }
 
 model tender {
-  id             String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  name           String             @db.VarChar(100)
-  description    String?
-  serviceType    tenderServiceType? @map("service_type")
+  id             String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name           String            @db.VarChar(100)
+  description    String            @default("")
+  serviceType    tenderServiceType @map("service_type")
   bids           bid[]
-  status         tenderStatus?
-  organizationId String?            @map("organization_id") @db.Uuid
-  organization   organization?      @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  version        Int                @default(1)
-  createdAt      DateTime?          @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt      DateTime?          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  status         tenderStatus      @default(Created)
+  organizationId String            @map("organization_id") @db.Uuid
+  organization   organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  version        Int               @default(1)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 }
 
 enum bidAuthorType {
