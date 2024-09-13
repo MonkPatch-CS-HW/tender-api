@@ -85,6 +85,29 @@ export class BidsService {
     return bids.map<BidData>((p) => mapPrismaToBidData(p));
   }
 
+  async getById(
+    bidId: string,
+    includeCreator?: false,
+  ): Promise<BidData<false> | null>;
+  async getById(
+    bidId: string,
+    includeCreator?: true,
+  ): Promise<BidData<true> | null>;
+  async getById(
+    bidId: string,
+    includeCreator: boolean = false,
+  ): Promise<BidData<boolean> | null> {
+    const bid = await this.prisma.bid.findFirst({
+      where: { id: bidId },
+    });
+
+    if (!bid) return null;
+
+    // needed for fancy typings to work
+    if (includeCreator) return mapPrismaToBidData(bid, true);
+    return mapPrismaToBidData(bid);
+  }
+
   async getByTender(
     tenderId: string,
     limit: number,
@@ -97,5 +120,19 @@ export class BidsService {
     });
 
     return bids.map<BidData>((p) => mapPrismaToBidData(p));
+  }
+
+  async updateStatus(
+    tenderId: string,
+    status: bidStatus,
+  ): Promise<BidData | null> {
+    const result = await this.prisma.bid.update({
+      where: { id: tenderId },
+      data: {
+        status: status,
+      },
+    });
+
+    return mapPrismaToBidData(result);
   }
 }

@@ -5,14 +5,16 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseEnumPipe,
   ParseUUIDPipe,
   Post,
+  Put,
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
 import { BidData, BidsService } from './bids.service';
 import { IsEnum, IsNotEmpty, IsUUID, Length, Min } from 'class-validator';
-import { bidAuthorType } from '@prisma/client';
+import { bidAuthorType, bidStatus } from '@prisma/client';
 import { TendersService } from 'src/tenders/tenders.service';
 import { EmployeesService } from 'src/employees/employees.service';
 
@@ -143,5 +145,44 @@ export class BidsController {
       query.limit,
       query.offset,
     );
+  }
+
+  @Get(':bidId/status')
+  async status(
+    @Param('bidId', ParseUUIDPipe) bidId: string,
+    @Query('username') username: string,
+  ): Promise<bidStatus> {
+    const employee = await this.employeesService.getByUsername(username);
+    if (employee === null)
+      throw new UnauthorizedException('Employee is not found');
+
+    const bid = await this.bidsService.getById(bidId, true);
+    if (bid === null) throw new NotFoundException('Bid is not found');
+
+    if (bid.creatorId !== employee.id)
+      throw new ForbiddenException(
+        'The employee is not the creator of the bid',
+      );
+
+    return bid.status;
+  }
+
+  @Put(':bidId/status')
+  async setStatus(
+    @Param('bidId', ParseUUIDPipe) bidId: string,
+    @Query('username') username: string,
+    @Query('status', new ParseEnumPipe(bidStatus)) status: bidStatus,
+  ): Promise<BidData> {
+    const employee = await this.employeesService.getByUsername(username);
+    if (employee === null)
+      throw new UnauthorizedException('Employee is not found');
+
+    const bid = await this.bidsService.getById(bidId, true);
+    if (bid === null) throw new NotFoundException('Bid is not found');
+
+    if (bid.creatorId !== employee.id)
+      throw new ForbiddenException('Employee is not the creator of the bid');
+
+    return await this.bidsService.updateStatus(bidId, status);
   }
 }
