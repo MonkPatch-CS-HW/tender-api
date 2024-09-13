@@ -80,6 +80,22 @@ class BidCreateBody {
   creatorUsername: string;
 }
 
+enum bidDecision {
+  Approved,
+  Rejected,
+}
+
+class SubmitBody {
+  @IsEnum(bidDecision)
+  decision: bidDecision;
+
+  @IsUUID()
+  bidId: string;
+
+  @IsNotEmpty()
+  username: string;
+}
+
 class BidEditBody {
   @IsNotEmpty()
   @Length(0, 100)
@@ -365,5 +381,34 @@ export class BidsController {
       authorId: author.id,
       tenderId: query.tenderId,
     });
+  }
+
+  @Put(':bidId/submit_decision')
+  async submit(@Body() data: SubmitBody): Promise<BidData> {
+    const bid = await this.bidsService.getById(data.bidId, true);
+    if (bid === null) throw new NotFoundException('Bid is not found');
+
+    const tender = await this.tendersService.getById(bid.tenderId);
+    if (tender === null) throw new NotFoundException('Tender is not found');
+
+    const employee = await this.employeesService.getByUsername(
+      data.username,
+      true,
+    );
+
+    switch (bid.authorType) {
+      case 'Organization':
+        if (!employee.organizationIds.includes(bid.authorId))
+          throw new ForbiddenException(
+            'User is not responsible for the organization',
+          );
+
+        if (tender.organizationId) break;
+      case 'User':
+        if (bid.authorId !== employee.id)
+          throw new ForbiddenException('Incorrect user');
+    }
+
+    return bid;
   }
 }
