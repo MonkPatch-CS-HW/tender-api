@@ -14,11 +14,28 @@ import {
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
-import { BidData, BidsService } from './bids.service';
+import { BidData, BidsService, FeedbackData } from './bids.service';
 import { IsEnum, IsNotEmpty, IsUUID, Length, Min } from 'class-validator';
 import { bidAuthorType, bidStatus } from '@prisma/client';
 import { TendersService } from 'src/tenders/tenders.service';
 import { EmployeesService } from 'src/employees/employees.service';
+
+class QueryReviews {
+  @Min(0)
+  offset: number = 0;
+
+  @Min(0)
+  limit: number = 5;
+
+  @IsNotEmpty()
+  authorUsername: string;
+
+  @IsNotEmpty()
+  requesterUsername: string;
+
+  @IsUUID()
+  tenderId: string;
+}
 
 class QueryBidsMy {
   @Min(0)
@@ -318,6 +335,35 @@ export class BidsController {
       bidId: data.bidId,
       message: data.bidFeedback,
       creatorId: employee.id,
+    });
+  }
+
+  @Get(':tenderId/reviews')
+  async reviews(@Query() query: QueryReviews): Promise<FeedbackData[]> {
+    const tender = await this.tendersService.getById(query.tenderId);
+    if (tender === null) throw new NotFoundException('Tender is not found');
+
+    const employee = await this.employeesService.getByUsername(
+      query.requesterUsername,
+      true,
+    );
+    if (employee === null)
+      throw new UnauthorizedException('Employee is not found');
+
+    const author = await this.employeesService.getByUsername(
+      query.authorUsername,
+    );
+    if (!author)
+      throw new UnauthorizedException('Employee-author is not found');
+
+    if (!employee.organizationIds.includes(tender.organizationId))
+      throw new ForbiddenException(
+        'Employee is not responsible for organization',
+      );
+
+    return await this.bidsService.reviews({
+      authorId: author.id,
+      tenderId: query.tenderId,
     });
   }
 }

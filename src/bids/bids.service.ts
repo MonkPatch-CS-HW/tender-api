@@ -33,6 +33,11 @@ export type FeedbackData = {
   creatorId: string;
 };
 
+type ReviewsData = {
+  authorId: string;
+  tenderId: string;
+};
+
 function mapPrismaToBidData(bid: bid, includeCreator?: false): BidData<false>;
 function mapPrismaToBidData(bid: bid, includeCreator: true): BidData<true>;
 function mapPrismaToBidData(
@@ -196,5 +201,16 @@ export class BidsService {
         creatorId: data.creatorId,
       },
     });
+  }
+
+  async reviews(data: ReviewsData): Promise<FeedbackData[]> {
+    const feedbacks = await this.prisma.feedback.findMany({
+      where: {
+        bid: { tenderId: data.tenderId },
+        creatorId: data.authorId,
+      },
+    });
+
+    return feedbacks;
   }
 }
