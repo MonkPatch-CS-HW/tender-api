@@ -6,11 +6,13 @@ import { PingModule } from './ping/ping.module';
 import { TendersModule } from './tenders/tenders.module';
 import { EmployeesService } from './employees/employees.service';
 import { PrismaService } from './prisma.service';
+import { BidsModule } from './bids/bids.module';
+import { OrganizationsService } from './organizations/organizations.service';
 
 @Module({
-  imports: [ConfigModule.forRoot(), PingModule, TendersModule],
+  imports: [ConfigModule.forRoot(), PingModule, TendersModule, BidsModule],
   controllers: [AppController],
-  providers: [PrismaService, AppService, EmployeesService],
+  providers: [PrismaService, AppService, EmployeesService, OrganizationsService],
 })
 export class AppModule {
   static port: number = 3000;

@@ -10,6 +10,36 @@ export type EmployeeData<FO extends boolean = false> = {
 export class EmployeesService {
   constructor(private prisma: PrismaService) {}
 
+  async getById(
+    id: string,
+    fetchOrganizationResponsible?: false,
+  ): Promise<EmployeeData<false> | null>;
+  async getById(
+    id: string,
+    fetchOrganizationResponsible: true,
+  ): Promise<EmployeeData<true> | null>;
+  async getById(
+    id: string,
+    fetchOrganizationResponsible: boolean = false,
+  ): Promise<EmployeeData<boolean> | null> {
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: id },
+      select: {
+        id: true,
+        username: true,
+        organizationResponsible: fetchOrganizationResponsible,
+      },
+    });
+
+    const orgs = employee.organizationResponsible ?? [];
+
+    return {
+      id: employee.id,
+      username: employee.username,
+      organizationIds: orgs.map((r) => r.organizationId),
+    };
+  }
+
   async getByUsername(
     username: string,
     fetchOrganizationResponsible?: false,
