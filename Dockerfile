@@ -12,4 +12,4 @@ COPY . .
 
 RUN pnpm build
 
-CMD pnpm start
+CMD prisma db push && pnpm start
