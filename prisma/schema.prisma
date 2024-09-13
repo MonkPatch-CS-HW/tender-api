@@ -56,6 +56,8 @@ model bid {
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt    DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   originalId   String?       @map("original_id") @db.Uuid
+
+  @@unique(fields: [originalId, version])
 }
 
 model tender {
@@ -73,6 +75,8 @@ model tender {
   createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt      DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   originalId     String?           @map("original_id") @db.Uuid
+
+  @@unique(fields: [originalId, version])
 }
 
 enum bidAuthorType {
