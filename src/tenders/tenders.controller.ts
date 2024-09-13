@@ -14,50 +14,11 @@ import {
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
-import { tender, tenderServiceType, tenderStatus } from '@prisma/client';
+import { tenderServiceType, tenderStatus } from '@prisma/client';
 import { Expose, Transform } from 'class-transformer';
 import { IsEnum, IsNotEmpty, Length, Min } from 'class-validator';
-import { PrismaService } from 'src/prisma.service';
-
-class RequestTenderNew {
-  @IsNotEmpty()
-  @Length(0, 100)
-  name: string;
-
-  @Length(0, 500)
-  description: string;
-
-  @IsEnum(tenderServiceType)
-  serviceType: tenderServiceType;
-
-  @IsNotEmpty()
-  organizationId: string;
-
-  @IsNotEmpty()
-  creatorUsername: string;
-}
-
-class RequestTenderEdit {
-  @IsNotEmpty()
-  @Length(0, 100)
-  name: string;
-
-  @Length(0, 500)
-  description: string;
-
-  @IsEnum(tenderServiceType)
-  serviceType: tenderServiceType;
-}
-
-class ResponseTender {
-  id: string;
-  name: string;
-  description: string;
-  status: tenderStatus;
-  serviceType: tenderServiceType;
-  version: number;
-  createdAt: string;
-}
+import { TenderData, TendersService } from './tenders.service';
+import { EmployeesService } from 'src/employees/employees.service';
 
 class QueryTendersMy {
   @Min(0)
@@ -77,94 +38,92 @@ class QueryTenders {
   @Min(0)
   limit: number = 5;
 
-  @Transform(({ value }) => [].concat(value))
+  @Transform(({ value }) => (value ? [].concat(value) : []))
   @IsEnum(tenderServiceType, { each: true })
   @Expose({ name: 'service_type' })
   serviceTypes: tenderServiceType[];
 }
 
-function mapPrismaToTender(tender: tender) {
-  return {
-    id: tender.id,
-    name: tender.name,
-    description: tender.description,
-    status: tender.status,
-    serviceType: tender.serviceType,
-    version: tender.version,
-    createdAt: tender.createdAt.toISOString(),
-  };
+export class TenderCreateBody {
+  @IsNotEmpty()
+  @Length(0, 100)
+  name: string;
+
+  @Length(0, 500)
+  description: string;
+
+  @IsEnum(tenderServiceType)
+  serviceType: tenderServiceType;
+
+  @IsNotEmpty()
+  organizationId: string;
+
+  @IsNotEmpty()
+  creatorUsername: string;
+}
+
+export class TenderEditBody {
+  @IsNotEmpty()
+  @Length(0, 100)
+  name: string;
+
+  @Length(0, 500)
+  description: string;
+
+  @IsEnum(tenderServiceType)
+  serviceType: tenderServiceType;
 }
 
 @Controller('tenders')
 export class TendersController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private employeesService: EmployeesService,
+    private tendersService: TendersService,
+  ) {}
 
   @Get()
-  async tenders(@Query() query: QueryTenders): Promise<ResponseTender[]> {
-    const tenders = await this.prisma.tender.findMany({
-      where: { serviceType: { in: query.serviceTypes }, originalId: null },
-      skip: query.offset,
-      take: query.limit,
-    });
-
-    return tenders.map<ResponseTender>(mapPrismaToTender);
+  async tenders(@Query() query: QueryTenders): Promise<TenderData[]> {
+    return await this.tendersService.get(
+      query.serviceTypes,
+      query.limit,
+      query.offset,
+    );
   }
 
   @Post('new')
-  async new(@Body() tender: RequestTenderNew): Promise<ResponseTender> {
-    const creator = await this.prisma.employee.findFirst({
-      where: {
-        username: tender.creatorUsername,
-      },
-      select: {
-        id: true,
-        organizationResponsible: {
-          where: {
-            organizationId: tender.organizationId,
-          },
-          select: {
-            organizationId: true,
-          },
-        },
-      },
-    });
+  async new(@Body() tender: TenderCreateBody): Promise<TenderData> {
+    const creator = await this.employeesService.getByUsername(
+      tender.creatorUsername,
+      true,
+    );
+    if (creator === null)
+      throw new UnauthorizedException('Employee is not found');
 
-    if (creator === null) throw new UnauthorizedException('User is not found');
-
-    if (creator.organizationResponsible.length === 0)
+    if (!creator.organizationIds.includes(tender.organizationId))
       throw new ForbiddenException(
-        'Organization is not found or user is not responsible',
+        'Organization is not found or employee is not responsible',
       );
 
-    const result = await this.prisma.tender.create({
-      data: {
-        name: tender.name,
-        description: tender.description,
-        serviceType: tender.serviceType,
-        organizationId: tender.organizationId,
-        creatorId: creator.id,
-      },
+    return await this.tendersService.create({
+      name: tender.name,
+      description: tender.description,
+      serviceType: tender.serviceType,
+      organizationId: tender.organizationId,
+      creatorId: creator.id,
     });
-
-    return mapPrismaToTender(result);
   }
 
   @Get('my')
-  async my(@Query() query: QueryTendersMy): Promise<ResponseTender[]> {
-    const creator = await this.prisma.employee.findFirst({
-      where: { username: query.username },
-      select: { id: true },
-    });
+  async my(@Query() query: QueryTendersMy): Promise<TenderData[]> {
+    const creator = await this.employeesService.getByUsername(query.username);
+    if (creator === null)
+      throw new UnauthorizedException('Employee is not found');
 
-    if (creator === null) throw new UnauthorizedException('User is not found');
-
-    const tenders = await this.prisma.tender.findMany({
-      where: { creatorId: creator.id, originalId: null },
-      skip: query.offset,
-      take: query.limit,
-    });
-
-    return tenders.map<ResponseTender>(mapPrismaToTender);
+    return await this.tendersService.getByCreator(
+      creator.id,
+      query.limit,
+      query.offset,
+    );
   }
 
   @Get(':tenderId/status')
@@ -172,27 +131,17 @@ export class TendersController {
     @Param('tenderId', ParseUUIDPipe) tenderId: string,
     @Query('username') username: string,
   ): Promise<tenderStatus> {
-    const user = await this.prisma.employee.findFirst({
-      where: { username: username },
-      select: {
-        id: true,
-      },
-    });
+    const employee = await this.employeesService.getByUsername(username);
+    if (employee === null)
+      throw new UnauthorizedException('Employee is not found');
 
-    if (user === null) throw new UnauthorizedException('User is not found');
-
-    const tender = await this.prisma.tender.findFirst({
-      where: { id: tenderId },
-      select: {
-        creatorId: true,
-        status: true,
-      },
-    });
-
+    const tender = await this.tendersService.getById(tenderId, true);
     if (tender === null) throw new NotFoundException('Tender is not found');
 
-    if (tender.creatorId !== user.id)
-      throw new ForbiddenException('The user is not the creator of the tender');
+    if (tender.creatorId !== employee.id)
+      throw new ForbiddenException(
+        'The employee is not the creator of the tender',
+      );
 
     return tender.status;
   }
@@ -202,84 +151,39 @@ export class TendersController {
     @Param('tenderId', ParseUUIDPipe) tenderId: string,
     @Query('username') username: string,
     @Query('status', new ParseEnumPipe(tenderStatus)) status: tenderStatus,
-  ): Promise<ResponseTender> {
-    const user = await this.prisma.employee.findFirst({
-      where: { username: username },
-      select: {
-        id: true,
-      },
-    });
+  ): Promise<TenderData> {
+    const employee = await this.employeesService.getByUsername(username);
+    if (employee === null)
+      throw new UnauthorizedException('Employee is not found');
 
-    if (user === null) throw new UnauthorizedException('User is not found');
-
-    const tender = await this.prisma.tender.findFirst({
-      where: { id: tenderId },
-      select: {
-        creatorId: true,
-        status: true,
-      },
-    });
-
+    const tender = await this.tendersService.getById(tenderId, true);
     if (tender === null) throw new NotFoundException('Tender is not found');
 
-    if (tender.creatorId !== user.id)
-      throw new ForbiddenException('The user is not the creator of the tender');
+    if (tender.creatorId !== employee.id)
+      throw new ForbiddenException('Employee is not the creator of the tender');
 
-    const result = await this.prisma.tender.update({
-      where: { id: tenderId },
-      data: {
-        status: status,
-      },
-    });
-
-    return mapPrismaToTender(result);
+    return await this.tendersService.updateStatus(tenderId, status);
   }
 
   @Patch(':tenderId/edit')
   async edit(
-    @Body() data: RequestTenderEdit,
+    @Body() data: TenderEditBody,
     @Param('tenderId', ParseUUIDPipe) tenderId: string,
     @Query('username') username: string,
-  ): Promise<ResponseTender> {
-    const tender = await this.prisma.tender.findFirst({
-      where: { id: tenderId },
-    });
-
+  ): Promise<TenderData> {
+    const tender = await this.tendersService.getById(tenderId);
     if (tender === null) throw new NotFoundException('Tender is not found');
 
-    const user = await this.prisma.employee.findFirst({
-      where: { username: username },
-      select: {
-        id: true,
-        organizationResponsible: {
-          select: { id: true },
-          where: { organizationId: tender.organizationId },
-        },
-      },
-    });
+    const employee = await this.employeesService.getByUsername(username, true);
+    if (employee === null)
+      throw new UnauthorizedException('Employee is not found');
 
-    if (user === null) throw new UnauthorizedException('User is not found');
+    if (!employee.organizationIds.includes(tender.organizationId))
+      throw new ForbiddenException(
+        'Employee is not responsible for organization',
+      );
 
-    if (user.organizationResponsible.length === 0)
-      throw new ForbiddenException('User is not responsible for organization');
-
-    const trans = await this.prisma.$transaction([
-      this.prisma.tender.create({
-        data: { ...tender, originalId: tender.id, id: void 0 },
-      }),
-      this.prisma.tender.update({
-        where: { id: tender.id },
-        data: {
-          ...tender,
-          name: data.name,
-          description: data.description,
-          serviceType: data.serviceType,
-          version: tender.version + 1,
-        },
-      }),
-    ]);
-
-    return mapPrismaToTender(trans[1]);
+    return await this.tendersService.edit(tenderId, data);
   }
 
   @Put(':tenderId/rollback/:version')
@@ -287,30 +191,20 @@ export class TendersController {
     @Param('tenderId', ParseUUIDPipe) tenderId: string,
     @Param('version', ParseIntPipe) version: number,
     @Query('username') username: string,
-  ): Promise<ResponseTender> {
-    const tender = await this.prisma.tender.findFirst({
-      where: { originalId: tenderId, version: version },
-    });
-
+  ): Promise<TenderData> {
+    const tender = await this.tendersService.getById(tenderId);
     if (tender === null)
       throw new NotFoundException('Tender or its version is not found');
 
-    const user = await this.prisma.employee.findFirst({
-      where: { username: username },
-      select: {
-        id: true,
-        organizationResponsible: {
-          select: { id: true },
-          where: { organizationId: tender.organizationId },
-        },
-      },
-    });
+    const employee = await this.employeesService.getByUsername(username, true);
+    if (employee === null)
+      throw new UnauthorizedException('Employee is not found');
 
-    if (user === null) throw new UnauthorizedException('User is not found');
+    if (!employee.organizationIds.includes(tender.organizationId))
+      throw new ForbiddenException(
+        'Employee is not responsible for organization',
+      );
 
-    if (user.organizationResponsible.length === 0)
-      throw new ForbiddenException('User is not responsible for organization');
-
-    return await this.edit(tender, tenderId, username);
+    return await this.tendersService.rollback(tenderId, version);
   }
 }
