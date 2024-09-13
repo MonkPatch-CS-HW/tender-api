@@ -17,6 +17,7 @@ model employee {
   organizationResponsible organizationResponsible[]
   bid                     bid[]
   tender                  tender[]
+  feedback                feedback[]
 }
 
 model organization {
@@ -58,6 +59,7 @@ model bid {
   organizationId String?       @db.Uuid
   creatorId      String        @map("creator_id") @db.Uuid
   creator        employee      @relation(fields: [creatorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  feedback       feedback[]
 
   @@unique(fields: [originalId, version])
 }
@@ -79,6 +81,15 @@ model tender {
   originalId     String?           @map("original_id") @db.Uuid
 
   @@unique(fields: [originalId, version])
+}
+
+model feedback {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  creatorId String   @map("creator_id") @db.Uuid
+  creator   employee @relation(fields: [creatorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  bidId     String   @map("bid_id") @db.Uuid
+  bid       bid      @relation(fields: [bidId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  message   String
 }
 
 enum bidAuthorType {

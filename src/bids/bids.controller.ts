@@ -72,6 +72,17 @@ class BidEditBody {
   description: string;
 }
 
+class BidFeedbackBody {
+  @IsNotEmpty()
+  bidFeedback: string;
+
+  @IsUUID()
+  bidId: string;
+
+  @IsNotEmpty()
+  username: string;
+}
+
 @Controller('bids')
 export class BidsController {
   constructor(
@@ -163,17 +174,26 @@ export class BidsController {
     @Param('bidId', ParseUUIDPipe) bidId: string,
     @Query('username') username: string,
   ): Promise<bidStatus> {
-    const employee = await this.employeesService.getByUsername(username);
-    if (employee === null)
-      throw new UnauthorizedException('Employee is not found');
-
     const bid = await this.bidsService.getById(bidId, true);
     if (bid === null) throw new NotFoundException('Bid is not found');
 
-    if (bid.creatorId !== employee.id)
-      throw new ForbiddenException(
-        'The employee is not the creator of the bid',
-      );
+    const tender = await this.tendersService.getById(bid.tenderId);
+    if (tender === null) throw new NotFoundException('Tender is not found');
+
+    const employee = await this.employeesService.getByUsername(username, true);
+
+    switch (bid.authorType) {
+      case 'Organization':
+        if (!employee.organizationIds.includes(bid.authorId))
+          throw new ForbiddenException(
+            'User is not responsible for the organization',
+          );
+
+        if (tender.organizationId) break;
+      case 'User':
+        if (bid.authorId !== employee.id)
+          throw new ForbiddenException('Incorrect user');
+    }
 
     return bid.status;
   }
@@ -184,15 +204,26 @@ export class BidsController {
     @Query('username') username: string,
     @Query('status', new ParseEnumPipe(bidStatus)) status: bidStatus,
   ): Promise<BidData> {
-    const employee = await this.employeesService.getByUsername(username);
-    if (employee === null)
-      throw new UnauthorizedException('Employee is not found');
-
     const bid = await this.bidsService.getById(bidId, true);
     if (bid === null) throw new NotFoundException('Bid is not found');
 
-    if (bid.creatorId !== employee.id)
-      throw new ForbiddenException('Employee is not the creator of the bid');
+    const tender = await this.tendersService.getById(bid.tenderId);
+    if (tender === null) throw new NotFoundException('Tender is not found');
+
+    const employee = await this.employeesService.getByUsername(username, true);
+
+    switch (bid.authorType) {
+      case 'Organization':
+        if (!employee.organizationIds.includes(bid.authorId))
+          throw new ForbiddenException(
+            'User is not responsible for the organization',
+          );
+
+        if (tender.organizationId) break;
+      case 'User':
+        if (bid.authorId !== employee.id)
+          throw new ForbiddenException('Incorrect user');
+    }
 
     return await this.bidsService.updateStatus(bidId, status);
   }
@@ -203,12 +234,26 @@ export class BidsController {
     @Param('bidId', ParseUUIDPipe) bidId: string,
     @Query('username') username: string,
   ): Promise<BidData> {
-    const bid = await this.bidsService.getById(bidId);
+    const bid = await this.bidsService.getById(bidId, true);
     if (bid === null) throw new NotFoundException('Bid is not found');
 
+    const tender = await this.tendersService.getById(bid.tenderId);
+    if (tender === null) throw new NotFoundException('Tender is not found');
+
     const employee = await this.employeesService.getByUsername(username, true);
-    if (employee === null)
-      throw new UnauthorizedException('Employee is not found');
+
+    switch (bid.authorType) {
+      case 'Organization':
+        if (!employee.organizationIds.includes(bid.authorId))
+          throw new ForbiddenException(
+            'User is not responsible for the organization',
+          );
+
+        if (tender.organizationId) break;
+      case 'User':
+        if (bid.authorId !== employee.id)
+          throw new ForbiddenException('Incorrect user');
+    }
 
     return await this.bidsService.edit(bidId, data);
   }
@@ -219,14 +264,60 @@ export class BidsController {
     @Param('version', ParseIntPipe) version: number,
     @Query('username') username: string,
   ): Promise<BidData> {
-    const bid = await this.bidsService.getById(bidId);
-    if (bid === null)
-      throw new NotFoundException('Bid or its version is not found');
+    const bid = await this.bidsService.getById(bidId, true);
+    if (bid === null) throw new NotFoundException('Bid is not found');
+
+    const tender = await this.tendersService.getById(bid.tenderId);
+    if (tender === null) throw new NotFoundException('Tender is not found');
 
     const employee = await this.employeesService.getByUsername(username, true);
-    if (employee === null)
-      throw new UnauthorizedException('Employee is not found');
+
+    switch (bid.authorType) {
+      case 'Organization':
+        if (!employee.organizationIds.includes(bid.authorId))
+          throw new ForbiddenException(
+            'User is not responsible for the organization',
+          );
+
+        if (tender.organizationId) break;
+      case 'User':
+        if (bid.authorId !== employee.id)
+          throw new ForbiddenException('Incorrect user');
+    }
 
     return await this.bidsService.rollback(bidId, version);
+  }
+
+  @Put(':bidId/feedback')
+  async feedback(@Body() data: BidFeedbackBody) {
+    const bid = await this.bidsService.getById(data.bidId, true);
+    if (bid === null) throw new NotFoundException('Bid is not found');
+
+    const tender = await this.tendersService.getById(bid.tenderId);
+    if (tender === null) throw new NotFoundException('Tender is not found');
+
+    const employee = await this.employeesService.getByUsername(
+      data.username,
+      true,
+    );
+
+    switch (bid.authorType) {
+      case 'Organization':
+        if (!employee.organizationIds.includes(bid.authorId))
+          throw new ForbiddenException(
+            'User is not responsible for the organization',
+          );
+
+        if (tender.organizationId) break;
+      case 'User':
+        if (bid.authorId !== employee.id)
+          throw new ForbiddenException('Incorrect user');
+    }
+
+    return await this.bidsService.feedback({
+      bidId: data.bidId,
+      message: data.bidFeedback,
+      creatorId: employee.id,
+    });
   }
 }

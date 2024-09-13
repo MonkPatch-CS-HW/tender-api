@@ -27,6 +27,12 @@ export type BidData<IC extends boolean = false> = BidEditData & {
   status: bidStatus;
 } & (IC extends true ? { creatorId: string } : {});
 
+export type FeedbackData = {
+  bidId: string;
+  message: string;
+  creatorId: string;
+};
+
 function mapPrismaToBidData(bid: bid, includeCreator?: false): BidData<false>;
 function mapPrismaToBidData(bid: bid, includeCreator: true): BidData<true>;
 function mapPrismaToBidData(
@@ -180,5 +186,15 @@ export class BidsService {
     if (!bid) return null;
 
     return await this.edit(bidId, bid);
+  }
+
+  async feedback(data: FeedbackData): Promise<FeedbackData> {
+    return await this.prisma.feedback.create({
+      data: {
+        message: data.message,
+        bidId: data.bidId,
+        creatorId: data.creatorId,
+      },
+    });
   }
 }
