@@ -83,7 +83,7 @@ export class TendersController {
 
   @Get()
   async tenders(@Query() query: QueryTenders): Promise<TenderData[]> {
-    return await this.tendersService.get(
+    return await this.tendersService.getPublished(
       query.serviceTypes,
       query.limit,
       query.offset,

@@ -53,7 +53,7 @@ function mapPrismaToTenderData(
 export class TendersService {
   constructor(private prisma: PrismaService) {}
 
-  async get(
+  async getPublished(
     serviceTypes: tenderServiceType[],
     limit: number,
     offset: number,
@@ -62,6 +62,7 @@ export class TendersService {
       where: {
         ...(serviceTypes.length ? { serviceType: { in: serviceTypes } } : {}),
         originalId: null,
+        status: tenderStatus.Published,
       },
       skip: offset,
       take: limit,
