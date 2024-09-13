@@ -3,9 +3,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PingModule } from './ping/ping.module';
+import { TendersModule } from './tenders/tenders.module';
 
 @Module({
-  imports: [PingModule, ConfigModule.forRoot()],
+  imports: [ConfigModule.forRoot(), PingModule, TendersModule],
   controllers: [AppController],
   providers: [AppService],
 })
