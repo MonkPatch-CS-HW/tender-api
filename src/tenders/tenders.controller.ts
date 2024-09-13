@@ -5,12 +5,14 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseEnumPipe,
+  ParseIntPipe,
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   UnauthorizedException,
-  UsePipes,
 } from '@nestjs/common';
 import { tender, tenderServiceType, tenderStatus } from '@prisma/client';
 import { Expose, Transform } from 'class-transformer';
@@ -195,6 +197,44 @@ export class TendersController {
     return tender.status;
   }
 
+  @Put(':tenderId/status')
+  async setStatus(
+    @Param('tenderId', ParseUUIDPipe) tenderId: string,
+    @Query('username') username: string,
+    @Query('status', new ParseEnumPipe(tenderStatus)) status: tenderStatus,
+  ): Promise<ResponseTender> {
+    const user = await this.prisma.employee.findFirst({
+      where: { username: username },
+      select: {
+        id: true,
+      },
+    });
+
+    if (user === null) throw new UnauthorizedException('User is not found');
+
+    const tender = await this.prisma.tender.findFirst({
+      where: { id: tenderId },
+      select: {
+        creatorId: true,
+        status: true,
+      },
+    });
+
+    if (tender === null) throw new NotFoundException('Tender is not found');
+
+    if (tender.creatorId !== user.id)
+      throw new ForbiddenException('The user is not the creator of the tender');
+
+    const result = await this.prisma.tender.update({
+      where: { id: tenderId },
+      data: {
+        status: status,
+      },
+    });
+
+    return mapPrismaToTender(result);
+  }
+
   @Patch(':tenderId/edit')
   async edit(
     @Body() data: RequestTenderEdit,
@@ -213,7 +253,7 @@ export class TendersController {
         id: true,
         organizationResponsible: {
           select: { id: true },
-          where: { id: tender.organizationId },
+          where: { organizationId: tender.organizationId },
         },
       },
     });
@@ -240,5 +280,37 @@ export class TendersController {
     ]);
 
     return mapPrismaToTender(trans[1]);
+  }
+
+  @Put(':tenderId/rollback/:version')
+  async rollback(
+    @Param('tenderId', ParseUUIDPipe) tenderId: string,
+    @Param('version', ParseIntPipe) version: number,
+    @Query('username') username: string,
+  ): Promise<ResponseTender> {
+    const tender = await this.prisma.tender.findFirst({
+      where: { originalId: tenderId, version: version },
+    });
+
+    if (tender === null)
+      throw new NotFoundException('Tender or its version is not found');
+
+    const user = await this.prisma.employee.findFirst({
+      where: { username: username },
+      select: {
+        id: true,
+        organizationResponsible: {
+          select: { id: true },
+          where: { organizationId: tender.organizationId },
+        },
+      },
+    });
+
+    if (user === null) throw new UnauthorizedException('User is not found');
+
+    if (user.organizationResponsible.length === 0)
+      throw new ForbiddenException('User is not responsible for organization');
+
+    return await this.edit(tender, tenderId, username);
   }
 }
