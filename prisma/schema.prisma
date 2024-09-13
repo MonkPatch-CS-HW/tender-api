@@ -55,6 +55,7 @@ model bid {
   version      Int           @default(1)
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt    DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  originalId   String?       @map("original_id") @db.Uuid
 }
 
 model tender {
@@ -71,6 +72,7 @@ model tender {
   creator        employee          @relation(fields: [creatorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt      DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  originalId     String?           @map("original_id") @db.Uuid
 }
 
 enum bidAuthorType {
