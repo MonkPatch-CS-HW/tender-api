@@ -114,7 +114,7 @@ export class BidsService {
     offset: number,
   ): Promise<BidData[]> {
     const bids = await this.prisma.bid.findMany({
-      where: { tenderId, originalId: null },
+      where: { tenderId, originalId: null, status: bidStatus.Published },
       skip: offset,
       take: limit,
     });
