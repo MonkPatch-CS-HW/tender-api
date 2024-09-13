@@ -1,27 +1,18 @@
 import {
   Body,
   Controller,
-  DefaultValuePipe,
   ForbiddenException,
   Get,
-  HttpException,
-  HttpStatus,
-  ParseIntPipe,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
   Post,
   Query,
   UnauthorizedException,
-  ValidationPipe,
 } from '@nestjs/common';
-import { tender, tenderServiceType, tenderStatus } from '@prisma/client';
-import { Expose, plainToInstance, Transform } from 'class-transformer';
-import {
-  IsArray,
-  IsEnum,
-  IsNotEmpty,
-  IsNumberString,
-  Length,
-  Min,
-} from 'class-validator';
+import { tenderServiceType, tenderStatus } from '@prisma/client';
+import { Expose, Transform } from 'class-transformer';
+import { IsEnum, IsNotEmpty, Length, Min } from 'class-validator';
 import { PrismaService } from 'src/prisma.service';
 
 class RequestTenderNew {
@@ -109,6 +100,9 @@ export class TendersController {
       select: {
         id: true,
         organizationResponsible: {
+          where: {
+            organizationId: tender.organizationId,
+          },
           select: {
             organizationId: true,
           },
@@ -118,8 +112,7 @@ export class TendersController {
 
     if (creator === null) throw new UnauthorizedException('User is not found');
 
-    const orgIds = creator.organizationResponsible.map((x) => x.organizationId);
-    if (!orgIds.includes(tender.organizationId))
+    if (creator.organizationResponsible.length === 0)
       throw new ForbiddenException(
         'Organization is not found or user is not responsible',
       );
@@ -169,5 +162,35 @@ export class TendersController {
       version: tender.version,
       createdAt: tender.createdAt.toISOString(),
     }));
+  }
+
+  @Get(':tenderId/status')
+  async status(
+    @Param(ParseUUIDPipe) tenderId: string,
+    @Query() username: string,
+  ): Promise<tenderStatus> {
+    const user = await this.prisma.employee.findFirst({
+      where: { username: username },
+      select: {
+        id: true,
+      },
+    });
+
+    if (user === null) throw new UnauthorizedException('User is not found');
+
+    const tender = await this.prisma.tender.findFirst({
+      where: { id: tenderId },
+      select: {
+        creatorId: true,
+        status: true,
+      },
+    });
+
+    if (tender === null) throw new NotFoundException('Tender is not found');
+
+    if (tender.creatorId !== user.id)
+      throw new ForbiddenException('The user is not the creator of the tender');
+
+    return tender.status;
   }
 }
