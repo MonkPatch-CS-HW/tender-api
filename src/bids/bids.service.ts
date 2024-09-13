@@ -14,16 +14,25 @@ export type BidCreateData = BidEditData & {
   tenderId: string;
   authorType: bidAuthorType;
   authorId: string;
+  creatorId: string;
 };
 
-export type BidData = BidCreateData & {
+export type BidData<IC extends boolean = false> = BidEditData & {
+  tenderId: string;
+  authorType: bidAuthorType;
+  authorId: string;
   id: string;
   version: number;
   createdAt: string;
   status: bidStatus;
-};
+} & (IC extends true ? { creatorId: string } : {});
 
-function mapPrismaToBidData(bid: bid): BidData {
+function mapPrismaToBidData(bid: bid, includeCreator?: false): BidData<false>;
+function mapPrismaToBidData(bid: bid, includeCreator: true): BidData<true>;
+function mapPrismaToBidData(
+  bid: bid,
+  includeCreator: boolean = false,
+): BidData<boolean> {
   return {
     id: bid.id,
     name: bid.name,
@@ -32,8 +41,9 @@ function mapPrismaToBidData(bid: bid): BidData {
     authorId: bid.authorId,
     tenderId: bid.tenderId,
     authorType: bid.authorType,
-    createdAt: bid.createdAt.toUTCString(),
+    createdAt: bid.createdAt.toISOString(),
     status: bid.status,
+    ...(includeCreator ? { creatorId: bid.creatorId } : {}),
   };
 }
 
@@ -45,19 +55,8 @@ export class BidsService {
     private employeesService: EmployeesService,
     private tendersService: TendersService,
   ) {}
-  async create(data: BidCreateData) {
-    if (
-      data.authorType === 'Organization' &&
-      !(await this.organizationsService.getById(data.authorId))
-    )
-      throw new NotFoundException('Could not find organization');
 
-    if (
-      data.authorType === 'User' &&
-      !(await this.employeesService.getById(data.authorId))
-    )
-      throw new NotFoundException('Could not find employee');
-
+  async create(data: BidCreateData): Promise<BidData<true>> {
     const bid = await this.prisma.bid.create({
       data: {
         name: data.name,
@@ -65,9 +64,38 @@ export class BidsService {
         authorType: data.authorType,
         tenderId: data.tenderId,
         authorId: data.authorId,
+        creatorId: data.creatorId,
       },
     });
 
-    return mapPrismaToBidData(bid);
+    return mapPrismaToBidData(bid, true);
+  }
+
+  async getByCreator(
+    creatorId: string,
+    limit: number,
+    offset: number,
+  ): Promise<BidData[]> {
+    const bids = await this.prisma.bid.findMany({
+      where: { creatorId, originalId: null },
+      skip: offset,
+      take: limit,
+    });
+
+    return bids.map<BidData>((p) => mapPrismaToBidData(p));
+  }
+
+  async getByTender(
+    tenderId: string,
+    limit: number,
+    offset: number,
+  ): Promise<BidData[]> {
+    const bids = await this.prisma.bid.findMany({
+      where: { tenderId, originalId: null },
+      skip: offset,
+      take: limit,
+    });
+
+    return bids.map<BidData>((p) => mapPrismaToBidData(p));
   }
 }

@@ -31,6 +31,8 @@ export class EmployeesService {
       },
     });
 
+    if (employee === null) return null;
+
     const orgs = employee.organizationResponsible ?? [];
 
     return {
@@ -60,6 +62,8 @@ export class EmployeesService {
         organizationResponsible: fetchOrganizationResponsible,
       },
     });
+
+    if (employee === null) return null;
 
     const orgs = employee.organizationResponsible ?? [];
 

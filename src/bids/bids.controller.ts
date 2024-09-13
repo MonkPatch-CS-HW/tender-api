@@ -2,14 +2,41 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  Get,
   NotFoundException,
+  Param,
+  ParseUUIDPipe,
   Post,
+  Query,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { BidsService } from './bids.service';
-import { IsEnum, IsNotEmpty, IsUUID, Length } from 'class-validator';
+import { BidData, BidsService } from './bids.service';
+import { IsEnum, IsNotEmpty, IsUUID, Length, Min } from 'class-validator';
 import { bidAuthorType } from '@prisma/client';
 import { TendersService } from 'src/tenders/tenders.service';
 import { EmployeesService } from 'src/employees/employees.service';
+
+class QueryBidsMy {
+  @Min(0)
+  offset: number = 0;
+
+  @Min(0)
+  limit: number = 5;
+
+  @IsNotEmpty()
+  username: string;
+}
+
+class QueryBidsList {
+  @Min(0)
+  offset: number = 0;
+
+  @Min(0)
+  limit: number = 5;
+
+  @IsNotEmpty()
+  username: string;
+}
 
 class BidCreateBody {
   @IsNotEmpty()
@@ -27,6 +54,9 @@ class BidCreateBody {
 
   @IsUUID()
   authorId: string;
+
+  @IsNotEmpty()
+  creatorUsername: string;
 }
 
 @Controller('bids')
@@ -61,6 +91,57 @@ export class BidsController {
             'User is not responsible for the organization',
           );
     }
-    return await this.bidsService.create(data);
+
+    const creator = await this.employeesService.getByUsername(
+      data.creatorUsername,
+    );
+
+    return await this.bidsService.create({
+      creatorId: creator.id,
+      authorType: data.authorType,
+      authorId: data.authorId,
+      description: data.description,
+      name: data.name,
+      tenderId: data.tenderId,
+    });
+  }
+
+  @Get('my')
+  async my(@Query() query: QueryBidsMy): Promise<BidData[]> {
+    const creator = await this.employeesService.getByUsername(query.username);
+    if (creator === null)
+      throw new UnauthorizedException('Employee is not found');
+
+    return await this.bidsService.getByCreator(
+      creator.id,
+      query.limit,
+      query.offset,
+    );
+  }
+
+  @Get(':tenderId/list')
+  async list(
+    @Param('tenderId', ParseUUIDPipe) tenderId: string,
+    @Query() query: QueryBidsList,
+  ): Promise<BidData[]> {
+    const employee = await this.employeesService.getByUsername(
+      query.username,
+      true,
+    );
+    if (employee === null) throw new NotFoundException('Employee is not found');
+
+    const tender = await this.tendersService.getById(tenderId);
+    if (tender === null) throw new NotFoundException('Tender is not found');
+
+    if (!employee.organizationIds.includes(tender.organizationId))
+      throw new ForbiddenException(
+        'Employee is not responsible for organization',
+      );
+
+    return await this.bidsService.getByTender(
+      tenderId,
+      query.limit,
+      query.offset,
+    );
   }
 }

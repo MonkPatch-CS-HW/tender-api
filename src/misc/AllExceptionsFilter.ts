@@ -4,6 +4,7 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 
@@ -27,7 +28,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const responseBody: { reason?: string } = {};
 
-    if (exception instanceof Error)
+    // stinky hack
+    if (exception instanceof BadRequestException)
+      responseBody.reason = (exception.getResponse() as any)?.message?.[0];
+    else if (exception instanceof Error)
       responseBody.reason = exception.message ?? exception.name;
 
     httpAdapter.reply(ctx.getResponse(), responseBody, httpStatus);
