@@ -135,4 +135,50 @@ export class BidsService {
 
     return mapPrismaToBidData(result);
   }
+
+  async getVersionById(
+    bidId: string,
+    version: number,
+  ): Promise<BidData | null> {
+    const bid = await this.prisma.bid.findFirst({
+      where: { originalId: bidId, version: version },
+    });
+
+    if (!bid) return null;
+
+    return { ...mapPrismaToBidData(bid), id: bid.originalId };
+  }
+
+  async edit(bidId: string, data: BidEditData) {
+    const bid = await this.prisma.$transaction(async () => {
+      const bid = await this.prisma.bid.findFirst({
+        where: { id: bidId },
+      });
+
+      if (!bid) return null;
+
+      await this.prisma.bid.create({
+        data: { ...bid, originalId: bid.id, id: void 0 },
+      });
+
+      return await this.prisma.bid.update({
+        where: { id: bid.id },
+        data: {
+          ...bid,
+          name: data.name,
+          description: data.description,
+          version: bid.version + 1,
+        },
+      });
+    });
+
+    return mapPrismaToBidData(bid);
+  }
+
+  async rollback(bidId: string, version: number): Promise<BidData | null> {
+    const bid = await this.getVersionById(bidId, version);
+    if (!bid) return null;
+
+    return await this.edit(bidId, bid);
+  }
 }

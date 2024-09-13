@@ -6,7 +6,9 @@ import {
   NotFoundException,
   Param,
   ParseEnumPipe,
+  ParseIntPipe,
   ParseUUIDPipe,
+  Patch,
   Post,
   Put,
   Query,
@@ -59,6 +61,15 @@ class BidCreateBody {
 
   @IsNotEmpty()
   creatorUsername: string;
+}
+
+class BidEditBody {
+  @IsNotEmpty()
+  @Length(0, 100)
+  name: string;
+
+  @Length(0, 500)
+  description: string;
 }
 
 @Controller('bids')
@@ -184,5 +195,38 @@ export class BidsController {
       throw new ForbiddenException('Employee is not the creator of the bid');
 
     return await this.bidsService.updateStatus(bidId, status);
+  }
+
+  @Patch(':bidId/edit')
+  async edit(
+    @Body() data: BidEditBody,
+    @Param('bidId', ParseUUIDPipe) bidId: string,
+    @Query('username') username: string,
+  ): Promise<BidData> {
+    const bid = await this.bidsService.getById(bidId);
+    if (bid === null) throw new NotFoundException('Bid is not found');
+
+    const employee = await this.employeesService.getByUsername(username, true);
+    if (employee === null)
+      throw new UnauthorizedException('Employee is not found');
+
+    return await this.bidsService.edit(bidId, data);
+  }
+
+  @Put(':bidId/rollback/:version')
+  async rollback(
+    @Param('bidId', ParseUUIDPipe) bidId: string,
+    @Param('version', ParseIntPipe) version: number,
+    @Query('username') username: string,
+  ): Promise<BidData> {
+    const bid = await this.bidsService.getById(bidId);
+    if (bid === null)
+      throw new NotFoundException('Bid or its version is not found');
+
+    const employee = await this.employeesService.getByUsername(username, true);
+    if (employee === null)
+      throw new UnauthorizedException('Employee is not found');
+
+    return await this.bidsService.rollback(bidId, version);
   }
 }
