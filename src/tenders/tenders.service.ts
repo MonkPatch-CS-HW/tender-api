@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { tender, tenderServiceType, tenderStatus } from '@prisma/client';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaService } from '../prisma.service';
 
 export type TenderEditData = {
   name: string;

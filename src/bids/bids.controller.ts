@@ -17,8 +17,8 @@ import {
 import { BidData, BidsService, FeedbackData } from './bids.service';
 import { IsEnum, IsNotEmpty, IsUUID, Length, Min } from 'class-validator';
 import { bidAuthorType, bidStatus } from '@prisma/client';
-import { TendersService } from 'src/tenders/tenders.service';
-import { EmployeesService } from 'src/employees/employees.service';
+import { TendersService } from '../tenders/tenders.service';
+import { EmployeesService } from '../employees/employees.service';
 
 class QueryReviews {
   @Min(0)

@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from './../src/app.module';
+import { AppModule } from '../src/app.module';
+import { AllExceptionsFilter } from '../src/misc/AllExceptionsFilter';
+import { HttpAdapterHost } from '@nestjs/core';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;
@@ -12,10 +14,25 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    const httpAdapter = app.get(HttpAdapterHost);
+
+    app.useGlobalFilters(new AllExceptionsFilter(httpAdapter));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        transformOptions: { enableImplicitConversion: true },
+        forbidNonWhitelisted: true,
+      }),
+    );
+
     await app.init();
   });
 
-  it('/ (GET)', () => {
+  it('/ping (GET)', () => {
     return request(app.getHttpServer()).get('/ping').expect(200).expect('ok');
+  });
+
+  it('/tenders (GET)', () => {
+    return request(app.getHttpServer()).get('/tenders').expect(200);
   });
 });

@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { bid, bidAuthorType, bidStatus } from '@prisma/client';
-import { EmployeesService } from 'src/employees/employees.service';
-import { OrganizationsService } from 'src/organizations/organizations.service';
-import { PrismaService } from 'src/prisma.service';
-import { TendersService } from 'src/tenders/tenders.service';
+import { EmployeesService } from '../employees/employees.service';
+import { OrganizationsService } from '../organizations/organizations.service';
+import { PrismaService } from '../prisma.service';
+import { TendersService } from '../tenders/tenders.service';
 
 export type BidEditData = {
   name: string;

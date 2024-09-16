@@ -18,7 +18,7 @@ import { tenderServiceType, tenderStatus } from '@prisma/client';
 import { Expose, Transform } from 'class-transformer';
 import { IsEnum, IsNotEmpty, Length, Min } from 'class-validator';
 import { TenderData, TendersService } from './tenders.service';
-import { EmployeesService } from 'src/employees/employees.service';
+import { EmployeesService } from '../employees/employees.service';
 
 class QueryTendersMy {
   @Min(0)
@@ -41,7 +41,7 @@ class QueryTenders {
   @Transform(({ value }) => (value ? [].concat(value) : []))
   @IsEnum(tenderServiceType, { each: true })
   @Expose({ name: 'service_type' })
-  serviceTypes: tenderServiceType[];
+  serviceTypes: tenderServiceType[] = [];
 }
 
 export class TenderCreateBody {
