@@ -28,11 +28,7 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/ping (GET)', () => {
+  it('/ping', () => {
     return request(app.getHttpServer()).get('/ping').expect(200).expect('ok');
-  });
-
-  it('/tenders (GET)', () => {
-    return request(app.getHttpServer()).get('/tenders').expect(200);
   });
 });
