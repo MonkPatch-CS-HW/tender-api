@@ -5,7 +5,6 @@ import {
   Get,
   NotFoundException,
   Param,
-  ParseEnumPipe,
   ParseIntPipe,
   ParseUUIDPipe,
   Patch,
@@ -72,6 +71,14 @@ export class TenderEditBody {
 
   @IsEnum(tenderServiceType)
   serviceType: tenderServiceType;
+}
+
+export class TenderPutStatusBody {
+  @IsEnum(tenderStatus)
+  status: tenderStatus;
+
+  @IsNotEmpty()
+  username: string;
 }
 
 @Controller('tenders')
@@ -149,10 +156,9 @@ export class TendersController {
   @Put(':tenderId/status')
   async setStatus(
     @Param('tenderId', ParseUUIDPipe) tenderId: string,
-    @Query('username') username: string,
-    @Query('status', new ParseEnumPipe(tenderStatus)) status: tenderStatus,
+    @Body() body: TenderPutStatusBody,
   ): Promise<TenderData> {
-    const employee = await this.employeesService.getByUsername(username);
+    const employee = await this.employeesService.getByUsername(body.username);
     if (employee === null)
       throw new UnauthorizedException('Employee is not found');
 
@@ -162,7 +168,7 @@ export class TendersController {
     if (tender.creatorId !== employee.id)
       throw new ForbiddenException('Employee is not the creator of the tender');
 
-    return await this.tendersService.updateStatus(tenderId, status);
+    return await this.tendersService.updateStatus(tenderId, body.status);
   }
 
   @Patch(':tenderId/edit')

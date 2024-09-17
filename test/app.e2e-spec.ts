@@ -24,26 +24,34 @@ interface TestConfig {
   yandexEmpUser: string;
 }
 
+interface TenderConfig {
+  avitoTenderId: string;
+  yandexTenderId: string;
+}
+
 async function initTenders(prisma: PrismaClient, config: TestConfig) {
   await prisma.tender.deleteMany();
 
-  await prisma.tender.createMany({
-    data: [
-      {
-        name: 'Avito Tender',
-        creatorId: config.avitoEmpId,
-        organizationId: config.avitoOrgId,
-        serviceType: tenderServiceType.Delivery,
-        status: tenderStatus.Published,
-      },
-      {
-        name: 'Yandex Tender',
-        creatorId: config.yandexEmpId,
-        organizationId: config.yandexOrgId,
-        serviceType: tenderServiceType.Manufacture,
-      },
-    ],
-  });
+  const [{ id: avitoTenderId }, { id: yandexTenderId }] =
+    await prisma.tender.createManyAndReturn({
+      data: [
+        {
+          name: 'Avito Tender',
+          creatorId: config.avitoEmpId,
+          organizationId: config.avitoOrgId,
+          serviceType: tenderServiceType.Delivery,
+          status: tenderStatus.Published,
+        },
+        {
+          name: 'Yandex Tender',
+          creatorId: config.yandexEmpId,
+          organizationId: config.yandexOrgId,
+          serviceType: tenderServiceType.Manufacture,
+        },
+      ],
+    });
+
+  return { avitoTenderId, yandexTenderId };
 }
 
 async function initDB(prisma: PrismaClient): Promise<TestConfig> {
@@ -143,8 +151,10 @@ describe('AppController (e2e)', () => {
   });
 
   describe('/tenders', () => {
+    let tenderConfig: TenderConfig;
+
     beforeEach(async () => {
-      await initTenders(prisma, config);
+      tenderConfig = await initTenders(prisma, config);
     });
 
     describe('/new', () => {
@@ -337,6 +347,78 @@ describe('AppController (e2e)', () => {
           .expect(200)
           .expect((response: Response & { body: TenderData[] }) => {
             expect(response.body).toHaveLength(0);
+          });
+      });
+    });
+
+    describe('/:tenderId/status', () => {
+      it('invalid request', () => {
+        return request(app.getHttpServer())
+          .get(`/tenders/INVALID/status?username=${config.avitoEmpUser}`)
+          .expect(400);
+      });
+
+      it('invalid tender', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/tenders/${config.yandexEmpId}/status?username=${config.avitoEmpUser}`,
+          )
+          .expect(404);
+      });
+
+      it('invalid user', () => {
+        return request(app.getHttpServer())
+          .get(`/tenders/${tenderConfig.avitoTenderId}/status?username=INVALID`)
+          .expect(401);
+      });
+
+      it('insiffucient rights', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/tenders/${tenderConfig.avitoTenderId}/status?username=${config.yandexEmpUser}`,
+          )
+          .expect(403);
+      });
+
+      it('correct get published', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/tenders/${tenderConfig.avitoTenderId}/status?username=${config.avitoEmpUser}`,
+          )
+          .expect(200)
+          .expect(tenderStatus.Published);
+      });
+
+      it('correct get created', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/tenders/${tenderConfig.yandexTenderId}/status?username=${config.yandexEmpUser}`,
+          )
+          .expect(200)
+          .expect(tenderStatus.Created);
+      });
+
+      it('invalid put request', () => {
+        return request(app.getHttpServer())
+          .put(`/tenders/${tenderConfig.yandexTenderId}/status`)
+          .send({})
+          .expect(400);
+      });
+
+      it('valid put', () => {
+        return request(app.getHttpServer())
+          .put(`/tenders/${tenderConfig.yandexTenderId}/status`)
+          .send({
+            username: config.yandexEmpUser,
+            status: tenderStatus.Canceled,
+          })
+          .expect(200)
+          .expect(async () => {
+            const tender = await prisma.tender.findFirst({
+              where: { id: tenderConfig.yandexTenderId },
+            });
+            expect(tender).not.toBeNull();
+            expect(tender.status).toBe(tenderStatus.Canceled);
           });
       });
     });
