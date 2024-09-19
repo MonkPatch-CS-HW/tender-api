@@ -112,7 +112,8 @@ async function initBids(
     data: {
       tenderId: tenderConfig.avitoTenderId,
       name: 'Yandex Bid for Avito Tender',
-      description: 'v2',
+      description: 'v1',
+      version: 1,
       authorType: bidAuthorType.Organization,
       authorId: config.yandexOrgId,
       creatorId: config.yandexEmpId,
@@ -1120,70 +1121,78 @@ describe('AppController (e2e)', () => {
         expect(savedBid.description).toBe('v2');
       });
     });
-    //
-    // describe('/:bidId/rollback', () => {
-    //   it('invalid request', () => {
-    //     return request(app.getHttpServer())
-    //       .put(`/bids/INVALID/rollback/1?username=${config.avitoEmpUser}`)
-    //       .expect(400);
-    //   });
-    //
-    //   it('invalid bid', () => {
-    //     return request(app.getHttpServer())
-    //       .put(
-    //         `/bids/${config.yandexEmpId}/rollback/1?username=${config.avitoEmpUser}`,
-    //       )
-    //       .expect(404);
-    //   });
-    //
-    //   it('invalid user', () => {
-    //     return request(app.getHttpServer())
-    //       .put(`/bids/${bidConfig.avitoBidId}/rollback/1?username=INVALID`)
-    //       .expect(401);
-    //   });
-    //
-    //   it('insufficient rights', () => {
-    //     return request(app.getHttpServer())
-    //       .put(
-    //         `/bids/${bidConfig.avitoBidId}/rollback/1?username=${config.yandexEmpUser}`,
-    //       )
-    //       .expect(403);
-    //   });
-    //
-    //   it('rollbacks correctly', async () => {
-    //     const response = await request(app.getHttpServer())
-    //       .put(
-    //         `/bids/${bidConfig.avitoBidId}/rollback/1?username=${config.avitoEmpUser}`,
-    //       )
-    //       .expect(200);
-    //
-    //     expect(response.body.version).toBe(3);
-    //     expect(response.body.description).toBe('v1');
-    //
-    //     const previousVersionsCount = await prisma.bid.count({
-    //       where: { originalId: bidConfig.avitoBidId },
-    //     });
-    //     expect(previousVersionsCount).toBe(2);
-    //
-    //     const currentBid = await prisma.bid.findFirst({
-    //       where: {
-    //         id: bidConfig.avitoBidId,
-    //       },
-    //     });
-    //
-    //     expect(currentBid).not.toBeNull();
-    //     expect(currentBid.description).toBe('v1');
-    //
-    //     const savedBid = await prisma.bid.findFirst({
-    //       where: {
-    //         originalId: bidConfig.avitoBidId,
-    //         version: 2,
-    //       },
-    //     });
-    //
-    //     expect(savedBid).not.toBeNull();
-    //     expect(savedBid.description).toBe('v2');
-    //   });
-    // });
+
+    describe('/:bidId/rollback', () => {
+      it('invalid request', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/INVALID/rollback/1?username=${config.avitoEmpUser}`)
+          .expect(400);
+      });
+
+      it('invalid bid', () => {
+        return request(app.getHttpServer())
+          .put(
+            `/bids/${config.yandexEmpId}/rollback/1?username=${config.avitoEmpUser}`,
+          )
+          .expect(404);
+      });
+
+      it('invalid user', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${bidConfig.avitoBidId}/rollback/1?username=INVALID`)
+          .expect(401);
+      });
+
+      it('insufficient rights author organization', () => {
+        return request(app.getHttpServer())
+          .put(
+            `/bids/${bidConfig.avitoBidId}/rollback/1?username=${config.avitoEmpUser}`,
+          )
+          .expect(403);
+      });
+
+      it('insufficient rights author user', () => {
+        return request(app.getHttpServer())
+          .put(
+            `/bids/${bidConfig.yandexBidId}/rollback/1?username=${config.yandexEmpUser}`,
+          )
+          .expect(403);
+      });
+
+      it('rollbacks correctly', async () => {
+        const response = await request(app.getHttpServer())
+          .put(
+            `/bids/${bidConfig.avitoBidId}/rollback/1?username=${config.yandexEmpUser}`,
+          )
+          .expect(200);
+
+        expect(response.body.version).toBe(3);
+        expect(response.body.description).toBe('v1');
+
+        const previousVersionsCount = await prisma.bid.count({
+          where: { originalId: bidConfig.avitoBidId },
+        });
+        expect(previousVersionsCount).toBe(2);
+
+        const currentBid = await prisma.bid.findFirst({
+          where: {
+            id: bidConfig.avitoBidId,
+          },
+        });
+
+        expect(currentBid).not.toBeNull();
+        expect(currentBid.description).toBe('v1');
+
+        const savedBid = await prisma.bid.findFirst({
+          where: {
+            originalId: bidConfig.avitoBidId,
+            version: 2,
+          },
+        });
+
+        expect(savedBid).not.toBeNull();
+        expect(savedBid.description).toBe('v2');
+      });
+    });
   });
 });
