@@ -5,13 +5,15 @@ import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/misc/AllExceptionsFilter';
 import { HttpAdapterHost } from '@nestjs/core';
 import {
+  bidAuthorType,
+  bidStatus,
   organizationType,
-  PrismaClient,
   tenderServiceType,
   tenderStatus,
 } from '@prisma/client';
 import { PrismaService } from '../src/prisma.service';
 import { TenderData } from 'src/tenders/tenders.service';
+import { BidData } from 'src/bids/bids.service';
 
 interface TestConfig {
   avitoEmpId: string;
@@ -29,7 +31,12 @@ interface TenderConfig {
   yandexTenderId: string;
 }
 
-async function initTenders(prisma: PrismaClient, config: TestConfig) {
+interface BidConfig {
+  avitoBidId: string;
+  yandexBidId: string;
+}
+
+async function initTenders(prisma: PrismaService, config: TestConfig) {
   await prisma.tender.deleteMany();
 
   const [{ id: avitoTenderId }, { id: yandexTenderId }] =
@@ -69,7 +76,18 @@ async function initTenders(prisma: PrismaClient, config: TestConfig) {
   return { avitoTenderId, yandexTenderId, avitoTenderIdV1 };
 }
 
-async function initDB(prisma: PrismaClient): Promise<TestConfig> {
+async function initBids(
+  prisma: PrismaService,
+  config: TestConfig,
+  tenderConfig: TenderConfig,
+): Promise<BidConfig> {
+  return {
+    avitoBidId: '',
+    yandexBidId: '',
+  };
+}
+
+async function initDB(prisma: PrismaService): Promise<TestConfig> {
   await prisma.employee.deleteMany();
   await prisma.organization.deleteMany();
   await prisma.organizationResponsible.deleteMany();
@@ -203,7 +221,7 @@ describe('AppController (e2e)', () => {
           .expect(401);
       });
 
-      it('insiffucient rights', () => {
+      it('insufficient rights', () => {
         return request(app.getHttpServer())
           .post('/tenders/new')
           .send({
@@ -386,7 +404,7 @@ describe('AppController (e2e)', () => {
           .expect(401);
       });
 
-      it('insiffucient rights', () => {
+      it('insufficient rights', () => {
         return request(app.getHttpServer())
           .get(
             `/tenders/${tenderConfig.avitoTenderId}/status?username=${config.yandexEmpUser}`,
@@ -471,7 +489,7 @@ describe('AppController (e2e)', () => {
           .expect(401);
       });
 
-      it('insiffucient rights', () => {
+      it('insufficient rights', () => {
         return request(app.getHttpServer())
           .patch(
             `/tenders/${tenderConfig.avitoTenderId}/edit?username=${config.yandexEmpUser}`,
@@ -548,7 +566,7 @@ describe('AppController (e2e)', () => {
           .expect(401);
       });
 
-      it('insiffucient rights', () => {
+      it('insufficient rights', () => {
         return request(app.getHttpServer())
           .put(
             `/tenders/${tenderConfig.avitoTenderId}/rollback/1?username=${config.yandexEmpUser}`,
@@ -591,5 +609,485 @@ describe('AppController (e2e)', () => {
         expect(savedTender.description).toBe('v2');
       });
     });
+  });
+
+  /*
+   *
+   *
+   *
+   *
+   * BIDS
+   *
+   *
+   *
+   *
+   */
+
+  describe('/bids', () => {
+    let bidConfig: BidConfig;
+    let tenderConfig: TenderConfig;
+
+    beforeEach(async () => {
+      tenderConfig = await initTenders(prisma, config);
+      bidConfig = await initBids(prisma, config, tenderConfig);
+    });
+
+    describe('/new', () => {
+      it('incorrect request', () => {
+        return request(app.getHttpServer()).post('/bids/new').expect(400);
+      });
+
+      it('not existing user author', () => {
+        return request(app.getHttpServer())
+          .post('/bids/new')
+          .send({
+            name: 'name',
+            description: 'description',
+            tenderId: tenderConfig.avitoTenderId,
+            authorType: bidAuthorType.User,
+            authorId: tenderConfig.avitoTenderId,
+            creatorUsername: config.avitoEmpUser,
+          })
+          .expect(401);
+      });
+
+      it('not existing org author', () => {
+        return request(app.getHttpServer())
+          .post('/bids/new')
+          .send({
+            name: 'name',
+            description: 'description',
+            tenderId: tenderConfig.avitoTenderId,
+            authorType: bidAuthorType.Organization,
+            authorId: tenderConfig.avitoTenderId,
+            creatorUsername: config.avitoEmpUser,
+          })
+          .expect(401);
+      });
+
+      it('invalid user author', () => {
+        return request(app.getHttpServer())
+          .post('/bids/new')
+          .send({
+            name: 'name',
+            description: 'description',
+            tenderId: tenderConfig.avitoTenderId,
+            authorType: bidAuthorType.User,
+            authorId: config.yandexOrgId,
+            creatorUsername: config.avitoEmpUser,
+          })
+          .expect(401);
+      });
+
+      it('invalid org author', () => {
+        return request(app.getHttpServer())
+          .post('/bids/new')
+          .send({
+            name: 'name',
+            description: 'description',
+            tenderId: tenderConfig.avitoTenderId,
+            authorType: bidAuthorType.Organization,
+            authorId: config.yandexEmpId,
+            creatorUsername: config.avitoEmpUser,
+          })
+          .expect(401);
+      });
+
+      it('insufficient user author', () => {
+        return request(app.getHttpServer())
+          .post('/bids/new')
+          .send({
+            name: 'name',
+            description: 'description',
+            tenderId: tenderConfig.avitoTenderId,
+            authorType: bidAuthorType.User,
+            authorId: config.yandexEmpId,
+            creatorUsername: config.avitoEmpUser,
+          })
+          .expect(403);
+      });
+
+      it('insufficient org author', () => {
+        return request(app.getHttpServer())
+          .post('/bids/new')
+          .send({
+            name: 'name',
+            description: 'description',
+            tenderId: tenderConfig.avitoTenderId,
+            authorType: bidAuthorType.Organization,
+            authorId: config.yandexOrgId,
+            creatorUsername: config.avitoEmpUser,
+          })
+          .expect(403);
+      });
+
+      it('invalid creator', () => {
+        return request(app.getHttpServer())
+          .post('/bids/new')
+          .send({
+            name: 'name',
+            description: 'description',
+            tenderId: tenderConfig.avitoTenderId,
+            authorType: bidAuthorType.Organization,
+            authorId: config.avitoOrgId,
+            creatorUsername: 'INVALID',
+          })
+          .expect(401);
+      });
+
+      it('creator not responsible for organization', () => {
+        return request(app.getHttpServer())
+          .post('/bids/new')
+          .send({
+            name: 'name',
+            description: 'description',
+            tenderId: tenderConfig.avitoTenderId,
+            authorType: bidAuthorType.Organization,
+            authorId: config.avitoOrgId,
+            creatorUsername: config.yandexEmpUser,
+          })
+          .expect(403);
+      });
+    });
+
+    // describe('/', () => {
+    //   it('invalid query', () => {
+    //     return request(app.getHttpServer())
+    //       .get('/bids?usernama=INVALID&limit=-1')
+    //       .expect(400);
+    //   });
+    //
+    //   it('shows and only shows open', () => {
+    //     return request(app.getHttpServer())
+    //       .get('/bids')
+    //       .expect(200)
+    //       .expect((response: Response & { body: BidData[] }) => {
+    //         expect(response.body).toHaveLength(1);
+    //       });
+    //   });
+    //
+    //   it('filter by serviceType incorrect ', () => {
+    //     return request(app.getHttpServer())
+    //       .get(`/bids?service_type=INVALID`)
+    //       .expect(400);
+    //   });
+    //
+    //   it('filter by serviceType includes matching', () => {
+    //     return request(app.getHttpServer())
+    //       .get(`/bids`)
+    //       .expect(200)
+    //       .expect((response: Response & { body: BidData[] }) => {
+    //         expect(response.body).toHaveLength(1);
+    //       });
+    //   });
+    //
+    //   it('filter by serviceType does not include not matching', () => {
+    //     return request(app.getHttpServer())
+    //       .get(`/bids?service_type=`)
+    //       .expect(200)
+    //       .expect((response: Response & { body: BidData[] }) => {
+    //         expect(response.body).toHaveLength(0);
+    //       });
+    //   });
+    //
+    //   it('limit works', () => {
+    //     return request(app.getHttpServer())
+    //       .get('/bids?limit=0')
+    //       .expect(200)
+    //       .expect((response: Response & { body: BidData[] }) => {
+    //         expect(response.body).toHaveLength(0);
+    //       });
+    //   });
+    //
+    //   it('offset works', () => {
+    //     return request(app.getHttpServer())
+    //       .get('/bids?offset=1')
+    //       .expect(200)
+    //       .expect((response: Response & { body: BidData[] }) => {
+    //         expect(response.body).toHaveLength(0);
+    //       });
+    //   });
+    // });
+    //
+    // describe('/my', () => {
+    //   it('invalid username', () => {
+    //     return request(app.getHttpServer())
+    //       .get('/bids/my?username=INVALID')
+    //       .expect(401);
+    //   });
+    //
+    //   it('invalid query', () => {
+    //     return request(app.getHttpServer())
+    //       .get('/bids/my?usernama=INVALID&limit=-1')
+    //       .expect(400);
+    //   });
+    //
+    //   it('shows open', () => {
+    //     return request(app.getHttpServer())
+    //       .get(`/bids/my?username=${config.avitoEmpUser}`)
+    //       .expect(200)
+    //       .expect((response: Response & { body: BidData[] }) => {
+    //         expect(response.body).toHaveLength(1);
+    //       });
+    //   });
+    //
+    //   it('shows closed', () => {
+    //     return request(app.getHttpServer())
+    //       .get(`/bids/my?username=${config.yandexEmpUser}`)
+    //       .expect(200)
+    //       .expect((response: Response & { body: BidData[] }) => {
+    //         expect(response.body).toHaveLength(1);
+    //         expect(response.body[0].tenderId).toBe(tenderConfig.yandexTenderId);
+    //       });
+    //   });
+    //
+    //   it('limit works', () => {
+    //     return request(app.getHttpServer())
+    //       .get(`/bids/my?username=${config.yandexEmpUser}&limit=0`)
+    //       .expect(200)
+    //       .expect((response: Response & { body: BidData[] }) => {
+    //         expect(response.body).toHaveLength(0);
+    //       });
+    //   });
+    //
+    //   it('offset works', () => {
+    //     return request(app.getHttpServer())
+    //       .get(`/bids/my?username=${config.yandexEmpUser}&offset=1`)
+    //       .expect(200)
+    //       .expect((response: Response & { body: BidData[] }) => {
+    //         expect(response.body).toHaveLength(0);
+    //       });
+    //   });
+    //
+    //   it('offset works', () => {
+    //     return request(app.getHttpServer())
+    //       .get(`/bids/my?username=${config.yandexEmpUser}&offset=1`)
+    //       .expect(200)
+    //       .expect((response: Response & { body: BidData[] }) => {
+    //         expect(response.body).toHaveLength(0);
+    //       });
+    //   });
+    // });
+    //
+    // describe('/:bidId/status', () => {
+    //   it('invalid request', () => {
+    //     return request(app.getHttpServer())
+    //       .get(`/bids/INVALID/status?username=${config.avitoEmpUser}`)
+    //       .expect(400);
+    //   });
+    //
+    //   it('invalid bid', () => {
+    //     return request(app.getHttpServer())
+    //       .get(
+    //         `/bids/${config.yandexEmpId}/status?username=${config.avitoEmpUser}`,
+    //       )
+    //       .expect(404);
+    //   });
+    //
+    //   it('invalid user', () => {
+    //     return request(app.getHttpServer())
+    //       .get(`/bids/${bidConfig.avitoBidId}/status?username=INVALID`)
+    //       .expect(401);
+    //   });
+    //
+    //   it('insufficient rights', () => {
+    //     return request(app.getHttpServer())
+    //       .get(
+    //         `/bids/${bidConfig.avitoBidId}/status?username=${config.yandexEmpUser}`,
+    //       )
+    //       .expect(403);
+    //   });
+    //
+    //   it('correct get published', () => {
+    //     return request(app.getHttpServer())
+    //       .get(
+    //         `/bids/${bidConfig.avitoBidId}/status?username=${config.avitoEmpUser}`,
+    //       )
+    //       .expect(200)
+    //       .expect(bidStatus.Published);
+    //   });
+    //
+    //   it('correct get created', () => {
+    //     return request(app.getHttpServer())
+    //       .get(
+    //         `/bids/${bidConfig.yandexBidId}/status?username=${config.yandexEmpUser}`,
+    //       )
+    //       .expect(200)
+    //       .expect(bidStatus.Created);
+    //   });
+    //
+    //   it('invalid put request', () => {
+    //     return request(app.getHttpServer())
+    //       .put(`/bids/${bidConfig.yandexBidId}/status`)
+    //       .send({})
+    //       .expect(400);
+    //   });
+    //
+    //   it('valid put', async () => {
+    //     const response = await request(app.getHttpServer())
+    //       .put(`/bids/${bidConfig.yandexBidId}/status`)
+    //       .send({
+    //         username: config.yandexEmpUser,
+    //         status: bidStatus.Canceled,
+    //       })
+    //       .expect(200);
+    //
+    //     expect(response.body).not.toBeNull();
+    //     expect(response.body.status).toBe(bidStatus.Canceled);
+    //
+    //     const bid = await prisma.bid.findFirst({
+    //       where: { id: bidConfig.yandexBidId },
+    //     });
+    //     expect(bid).not.toBeNull();
+    //     expect(bid.status).toBe(bidStatus.Canceled);
+    //   });
+    // });
+    //
+    // describe('/:bidId/edit', () => {
+    //   it('invalid request', () => {
+    //     return request(app.getHttpServer())
+    //       .patch(`/bids/INVALID/edit?username=${config.avitoEmpUser}`)
+    //       .send({})
+    //       .expect(400);
+    //   });
+    //
+    //   it('invalid bid', () => {
+    //     return request(app.getHttpServer())
+    //       .patch(
+    //         `/bids/${config.yandexEmpId}/edit?username=${config.avitoEmpUser}`,
+    //       )
+    //       .send({
+    //         name: 'Avito Bid',
+    //         description: 'v3',
+    //       })
+    //       .expect(404);
+    //   });
+    //
+    //   it('invalid user', () => {
+    //     return request(app.getHttpServer())
+    //       .patch(`/bids/${bidConfig.avitoBidId}/edit?username=INVALID`)
+    //       .send({
+    //         name: 'Avito Bid',
+    //         description: 'v3',
+    //       })
+    //       .expect(401);
+    //   });
+    //
+    //   it('insufficient rights', () => {
+    //     return request(app.getHttpServer())
+    //       .patch(
+    //         `/bids/${bidConfig.avitoBidId}/edit?username=${config.yandexEmpUser}`,
+    //       )
+    //       .send({
+    //         name: 'Avito Bid',
+    //         description: 'v3',
+    //       })
+    //       .expect(403);
+    //   });
+    //
+    //   it('edits correctly', async () => {
+    //     const response = await request(app.getHttpServer())
+    //       .patch(
+    //         `/bids/${bidConfig.avitoBidId}/edit?username=${config.avitoEmpUser}`,
+    //       )
+    //       .send({
+    //         name: 'Avito Bid',
+    //         description: 'v3',
+    //       })
+    //       .expect(200);
+    //
+    //     expect(response.body.version).toBe(3);
+    //     expect(response.body.description).toBe('v3');
+    //
+    //     const previousVersionsCount = await prisma.bid.count({
+    //       where: { originalId: bidConfig.avitoBidId },
+    //     });
+    //     expect(previousVersionsCount).toBe(2);
+    //
+    //     const currentBid = await prisma.bid.findFirst({
+    //       where: {
+    //         id: bidConfig.avitoBidId,
+    //       },
+    //     });
+    //
+    //     expect(currentBid).not.toBeNull();
+    //     expect(currentBid.description).toBe('v3');
+    //
+    //     const savedBid = await prisma.bid.findFirst({
+    //       where: {
+    //         originalId: bidConfig.avitoBidId,
+    //         version: 2,
+    //       },
+    //     });
+    //
+    //     expect(savedBid).not.toBeNull();
+    //     expect(savedBid.description).toBe('v2');
+    //   });
+    // });
+    //
+    // describe('/:bidId/rollback', () => {
+    //   it('invalid request', () => {
+    //     return request(app.getHttpServer())
+    //       .put(`/bids/INVALID/rollback/1?username=${config.avitoEmpUser}`)
+    //       .expect(400);
+    //   });
+    //
+    //   it('invalid bid', () => {
+    //     return request(app.getHttpServer())
+    //       .put(
+    //         `/bids/${config.yandexEmpId}/rollback/1?username=${config.avitoEmpUser}`,
+    //       )
+    //       .expect(404);
+    //   });
+    //
+    //   it('invalid user', () => {
+    //     return request(app.getHttpServer())
+    //       .put(`/bids/${bidConfig.avitoBidId}/rollback/1?username=INVALID`)
+    //       .expect(401);
+    //   });
+    //
+    //   it('insufficient rights', () => {
+    //     return request(app.getHttpServer())
+    //       .put(
+    //         `/bids/${bidConfig.avitoBidId}/rollback/1?username=${config.yandexEmpUser}`,
+    //       )
+    //       .expect(403);
+    //   });
+    //
+    //   it('rollbacks correctly', async () => {
+    //     const response = await request(app.getHttpServer())
+    //       .put(
+    //         `/bids/${bidConfig.avitoBidId}/rollback/1?username=${config.avitoEmpUser}`,
+    //       )
+    //       .expect(200);
+    //
+    //     expect(response.body.version).toBe(3);
+    //     expect(response.body.description).toBe('v1');
+    //
+    //     const previousVersionsCount = await prisma.bid.count({
+    //       where: { originalId: bidConfig.avitoBidId },
+    //     });
+    //     expect(previousVersionsCount).toBe(2);
+    //
+    //     const currentBid = await prisma.bid.findFirst({
+    //       where: {
+    //         id: bidConfig.avitoBidId,
+    //       },
+    //     });
+    //
+    //     expect(currentBid).not.toBeNull();
+    //     expect(currentBid.description).toBe('v1');
+    //
+    //     const savedBid = await prisma.bid.findFirst({
+    //       where: {
+    //         originalId: bidConfig.avitoBidId,
+    //         version: 2,
+    //       },
+    //     });
+    //
+    //     expect(savedBid).not.toBeNull();
+    //     expect(savedBid.description).toBe('v2');
+    //   });
+    // });
   });
 });

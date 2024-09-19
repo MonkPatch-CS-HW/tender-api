@@ -19,6 +19,7 @@ import { IsEnum, IsNotEmpty, IsUUID, Length, Min } from 'class-validator';
 import { bidAuthorType, bidStatus } from '@prisma/client';
 import { TendersService } from '../tenders/tenders.service';
 import { EmployeesService } from '../employees/employees.service';
+import { OrganizationsService } from '../organizations/organizations.service';
 
 class QueryReviews {
   @Min(0)
@@ -122,6 +123,7 @@ export class BidsController {
     private bidsService: BidsService,
     private tendersService: TendersService,
     private employeesService: EmployeesService,
+    private organizationsService: OrganizationsService,
   ) {}
 
   @Post('new')
@@ -129,29 +131,39 @@ export class BidsController {
     const tender = await this.tendersService.getById(data.tenderId);
     if (tender === null) throw new NotFoundException('Tender is not found');
 
-    switch (data.authorType) {
-      case 'Organization':
-        if (tender.organizationId !== data.authorId)
-          throw new ForbiddenException(
-            'Organization is not the owner of the tender',
-          );
-        break;
-      case 'User':
-        const employee = await this.employeesService.getById(
-          data.authorId,
-          true,
-        );
-        if (employee === null) throw new NotFoundException('User is not found');
-
-        if (!employee.organizationIds.includes(tender.organizationId))
-          throw new ForbiddenException(
-            'User is not responsible for the organization',
-          );
-    }
-
     const creator = await this.employeesService.getByUsername(
       data.creatorUsername,
+      true,
     );
+
+    if (creator === null)
+      throw new UnauthorizedException('Creator is not found by username');
+
+    switch (data.authorType) {
+      case 'Organization':
+        const organization = await this.organizationsService.getById(
+          data.authorId,
+        );
+        if (organization === null)
+          throw new UnauthorizedException('Organization author was not found');
+
+        if (!creator.organizationIds.includes(data.authorId))
+          throw new ForbiddenException(
+            'Creator is not responsible for organization',
+          );
+
+        break;
+      case 'User':
+        const employee = await this.employeesService.getById(data.authorId);
+        if (employee === null)
+          throw new UnauthorizedException('User author was not found');
+
+        if (creator.id !== data.authorId)
+          throw new ForbiddenException(
+            'User author is not the same as creator',
+          );
+        break;
+    }
 
     return await this.bidsService.create({
       creatorId: creator.id,
