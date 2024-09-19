@@ -37,10 +37,12 @@ async function initTenders(prisma: PrismaClient, config: TestConfig) {
       data: [
         {
           name: 'Avito Tender',
+          description: 'v2',
           creatorId: config.avitoEmpId,
           organizationId: config.avitoOrgId,
           serviceType: tenderServiceType.Delivery,
           status: tenderStatus.Published,
+          version: 2,
         },
         {
           name: 'Yandex Tender',
@@ -51,7 +53,20 @@ async function initTenders(prisma: PrismaClient, config: TestConfig) {
       ],
     });
 
-  return { avitoTenderId, yandexTenderId };
+  const { id: avitoTenderIdV1 } = await prisma.tender.create({
+    data: {
+      name: 'Avito Tender',
+      description: 'v1',
+      creatorId: config.avitoEmpId,
+      organizationId: config.avitoOrgId,
+      serviceType: tenderServiceType.Delivery,
+      status: tenderStatus.Published,
+      version: 1,
+      originalId: avitoTenderId,
+    },
+  });
+
+  return { avitoTenderId, yandexTenderId, avitoTenderIdV1 };
 }
 
 async function initDB(prisma: PrismaClient): Promise<TestConfig> {
@@ -201,8 +216,8 @@ describe('AppController (e2e)', () => {
           .expect(403);
       });
 
-      it('actually creates', () => {
-        return request(app.getHttpServer())
+      it('actually creates', async () => {
+        const response = await request(app.getHttpServer())
           .post('/tenders/new')
           .send({
             name: 'string',
@@ -211,13 +226,12 @@ describe('AppController (e2e)', () => {
             organizationId: config.avitoOrgId,
             creatorUsername: config.avitoEmpUser,
           })
-          .expect(201)
-          .expect(async (response: Response & { body: TenderData }) => {
-            expect(response.body).toHaveProperty('id');
-            const id = response.body.id;
-            const tender = await prisma.tender.findFirst({ where: { id } });
-            expect(tender).not.toBeNull();
-          });
+          .expect(201);
+
+        expect(response.body).toHaveProperty('id');
+        const id = response.body.id;
+        const tender = await prisma.tender.findFirst({ where: { id } });
+        expect(tender).not.toBeNull();
       });
     });
 
@@ -233,10 +247,10 @@ describe('AppController (e2e)', () => {
           .get('/tenders')
           .expect(200)
           .expect((response: Response & { body: TenderData[] }) => {
-            return (
-              response.body.length === 1 &&
-              response.body[0].organizationId === config.avitoOrgId &&
-              response.body[0].serviceType === tenderServiceType.Delivery
+            expect(response.body).toHaveLength(1);
+            expect(response.body[0].organizationId).toBe(config.avitoOrgId);
+            expect(response.body[0].serviceType).toBe(
+              tenderServiceType.Delivery,
             );
           });
       });
@@ -405,21 +419,176 @@ describe('AppController (e2e)', () => {
           .expect(400);
       });
 
-      it('valid put', () => {
-        return request(app.getHttpServer())
+      it('valid put', async () => {
+        const response = await request(app.getHttpServer())
           .put(`/tenders/${tenderConfig.yandexTenderId}/status`)
           .send({
             username: config.yandexEmpUser,
             status: tenderStatus.Canceled,
           })
-          .expect(200)
-          .expect(async () => {
-            const tender = await prisma.tender.findFirst({
-              where: { id: tenderConfig.yandexTenderId },
-            });
-            expect(tender).not.toBeNull();
-            expect(tender.status).toBe(tenderStatus.Canceled);
-          });
+          .expect(200);
+
+        expect(response.body).not.toBeNull();
+        expect(response.body.status).toBe(tenderStatus.Canceled);
+
+        const tender = await prisma.tender.findFirst({
+          where: { id: tenderConfig.yandexTenderId },
+        });
+        expect(tender).not.toBeNull();
+        expect(tender.status).toBe(tenderStatus.Canceled);
+      });
+    });
+
+    describe('/:tenderId/edit', () => {
+      it('invalid request', () => {
+        return request(app.getHttpServer())
+          .patch(`/tenders/INVALID/edit?username=${config.avitoEmpUser}`)
+          .send({})
+          .expect(400);
+      });
+
+      it('invalid tender', () => {
+        return request(app.getHttpServer())
+          .patch(
+            `/tenders/${config.yandexEmpId}/edit?username=${config.avitoEmpUser}`,
+          )
+          .send({
+            name: 'Avito Tender',
+            description: 'v3',
+            serviceType: tenderServiceType.Delivery,
+          })
+          .expect(404);
+      });
+
+      it('invalid user', () => {
+        return request(app.getHttpServer())
+          .patch(`/tenders/${tenderConfig.avitoTenderId}/edit?username=INVALID`)
+          .send({
+            name: 'Avito Tender',
+            description: 'v3',
+            serviceType: tenderServiceType.Delivery,
+          })
+          .expect(401);
+      });
+
+      it('insiffucient rights', () => {
+        return request(app.getHttpServer())
+          .patch(
+            `/tenders/${tenderConfig.avitoTenderId}/edit?username=${config.yandexEmpUser}`,
+          )
+          .send({
+            name: 'Avito Tender',
+            description: 'v3',
+            serviceType: tenderServiceType.Delivery,
+          })
+          .expect(403);
+      });
+
+      it('edits correctly', async () => {
+        const response = await request(app.getHttpServer())
+          .patch(
+            `/tenders/${tenderConfig.avitoTenderId}/edit?username=${config.avitoEmpUser}`,
+          )
+          .send({
+            name: 'Avito Tender',
+            description: 'v3',
+            serviceType: tenderServiceType.Delivery,
+          })
+          .expect(200);
+
+        expect(response.body.version).toBe(3);
+        expect(response.body.description).toBe('v3');
+
+        const previousVersionsCount = await prisma.tender.count({
+          where: { originalId: tenderConfig.avitoTenderId },
+        });
+        expect(previousVersionsCount).toBe(2);
+
+        const currentTender = await prisma.tender.findFirst({
+          where: {
+            id: tenderConfig.avitoTenderId,
+          },
+        });
+
+        expect(currentTender).not.toBeNull();
+        expect(currentTender.description).toBe('v3');
+
+        const savedTender = await prisma.tender.findFirst({
+          where: {
+            originalId: tenderConfig.avitoTenderId,
+            version: 2,
+          },
+        });
+
+        expect(savedTender).not.toBeNull();
+        expect(savedTender.description).toBe('v2');
+      });
+    });
+
+    describe('/:tenderId/rollback', () => {
+      it('invalid request', () => {
+        return request(app.getHttpServer())
+          .put(`/tenders/INVALID/rollback/1?username=${config.avitoEmpUser}`)
+          .expect(400);
+      });
+
+      it('invalid tender', () => {
+        return request(app.getHttpServer())
+          .put(
+            `/tenders/${config.yandexEmpId}/rollback/1?username=${config.avitoEmpUser}`,
+          )
+          .expect(404);
+      });
+
+      it('invalid user', () => {
+        return request(app.getHttpServer())
+          .put(
+            `/tenders/${tenderConfig.avitoTenderId}/rollback/1?username=INVALID`,
+          )
+          .expect(401);
+      });
+
+      it('insiffucient rights', () => {
+        return request(app.getHttpServer())
+          .put(
+            `/tenders/${tenderConfig.avitoTenderId}/rollback/1?username=${config.yandexEmpUser}`,
+          )
+          .expect(403);
+      });
+
+      it('rollbacks correctly', async () => {
+        const response = await request(app.getHttpServer())
+          .put(
+            `/tenders/${tenderConfig.avitoTenderId}/rollback/1?username=${config.avitoEmpUser}`,
+          )
+          .expect(200);
+
+        expect(response.body.version).toBe(3);
+        expect(response.body.description).toBe('v1');
+
+        const previousVersionsCount = await prisma.tender.count({
+          where: { originalId: tenderConfig.avitoTenderId },
+        });
+        expect(previousVersionsCount).toBe(2);
+
+        const currentTender = await prisma.tender.findFirst({
+          where: {
+            id: tenderConfig.avitoTenderId,
+          },
+        });
+
+        expect(currentTender).not.toBeNull();
+        expect(currentTender.description).toBe('v1');
+
+        const savedTender = await prisma.tender.findFirst({
+          where: {
+            originalId: tenderConfig.avitoTenderId,
+            version: 2,
+          },
+        });
+
+        expect(savedTender).not.toBeNull();
+        expect(savedTender.description).toBe('v2');
       });
     });
   });

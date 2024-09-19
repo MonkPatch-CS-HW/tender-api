@@ -112,7 +112,7 @@ export class TendersService {
     includeCreator: boolean = false,
   ): Promise<TenderData<boolean> | null> {
     const tender = await this.prisma.tender.findFirst({
-      where: { id: tenderId },
+      where: { id: tenderId, originalId: null },
     });
 
     if (!tender) return null;
