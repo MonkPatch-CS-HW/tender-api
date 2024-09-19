@@ -197,7 +197,8 @@ export class BidsController {
       query.username,
       true,
     );
-    if (employee === null) throw new NotFoundException('Employee is not found');
+    if (employee === null)
+      throw new UnauthorizedException('Employee is not found');
 
     const tender = await this.tendersService.getById(tenderId);
     if (tender === null) throw new NotFoundException('Tender is not found');

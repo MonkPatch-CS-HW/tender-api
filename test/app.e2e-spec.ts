@@ -28,12 +28,16 @@ interface TestConfig {
 
 interface TenderConfig {
   avitoTenderId: string;
+  avitoTenderIdV1: string;
+
   yandexTenderId: string;
 }
 
 interface BidConfig {
   avitoBidId: string;
   yandexBidId: string;
+
+  yandexBidIdV1: string;
 }
 
 async function initTenders(prisma: PrismaService, config: TestConfig) {
@@ -81,10 +85,42 @@ async function initBids(
   config: TestConfig,
   tenderConfig: TenderConfig,
 ): Promise<BidConfig> {
-  return {
-    avitoBidId: '',
-    yandexBidId: '',
-  };
+  const [{ id: avitoBidId }, { id: yandexBidId }] =
+    await prisma.bid.createManyAndReturn({
+      data: [
+        {
+          tenderId: tenderConfig.avitoTenderId,
+          name: 'Yandex Bid for Avito Tender',
+          description: 'v2',
+          authorType: bidAuthorType.Organization,
+          authorId: config.yandexOrgId,
+          creatorId: config.yandexEmpId,
+          status: bidStatus.Published,
+        },
+        {
+          tenderId: tenderConfig.yandexTenderId,
+          name: 'Avito Bid for Yandex Tender',
+          authorType: bidAuthorType.User,
+          authorId: config.avitoEmpId,
+          creatorId: config.avitoEmpId,
+        },
+      ],
+    });
+
+  const { id: yandexBidIdV1 } = await prisma.bid.create({
+    data: {
+      tenderId: tenderConfig.avitoTenderId,
+      name: 'Yandex Bid for Avito Tender',
+      description: 'v2',
+      authorType: bidAuthorType.Organization,
+      authorId: config.yandexOrgId,
+      creatorId: config.yandexEmpId,
+      status: bidStatus.Published,
+      originalId: yandexBidId,
+    },
+  });
+
+  return { avitoBidId, yandexBidId, yandexBidIdV1 };
 }
 
 async function initDB(prisma: PrismaService): Promise<TestConfig> {
@@ -260,7 +296,7 @@ describe('AppController (e2e)', () => {
           .expect(400);
       });
 
-      it('shows and only shows open', () => {
+      it('shows and only shows published', () => {
         return request(app.getHttpServer())
           .get('/tenders')
           .expect(200)
@@ -335,7 +371,7 @@ describe('AppController (e2e)', () => {
           .expect(400);
       });
 
-      it('shows open', () => {
+      it('shows published', () => {
         return request(app.getHttpServer())
           .get(`/tenders/my?username=${config.avitoEmpUser}`)
           .expect(200)
@@ -750,125 +786,124 @@ describe('AppController (e2e)', () => {
       });
     });
 
-    // describe('/', () => {
-    //   it('invalid query', () => {
-    //     return request(app.getHttpServer())
-    //       .get('/bids?usernama=INVALID&limit=-1')
-    //       .expect(400);
-    //   });
-    //
-    //   it('shows and only shows open', () => {
-    //     return request(app.getHttpServer())
-    //       .get('/bids')
-    //       .expect(200)
-    //       .expect((response: Response & { body: BidData[] }) => {
-    //         expect(response.body).toHaveLength(1);
-    //       });
-    //   });
-    //
-    //   it('filter by serviceType incorrect ', () => {
-    //     return request(app.getHttpServer())
-    //       .get(`/bids?service_type=INVALID`)
-    //       .expect(400);
-    //   });
-    //
-    //   it('filter by serviceType includes matching', () => {
-    //     return request(app.getHttpServer())
-    //       .get(`/bids`)
-    //       .expect(200)
-    //       .expect((response: Response & { body: BidData[] }) => {
-    //         expect(response.body).toHaveLength(1);
-    //       });
-    //   });
-    //
-    //   it('filter by serviceType does not include not matching', () => {
-    //     return request(app.getHttpServer())
-    //       .get(`/bids?service_type=`)
-    //       .expect(200)
-    //       .expect((response: Response & { body: BidData[] }) => {
-    //         expect(response.body).toHaveLength(0);
-    //       });
-    //   });
-    //
-    //   it('limit works', () => {
-    //     return request(app.getHttpServer())
-    //       .get('/bids?limit=0')
-    //       .expect(200)
-    //       .expect((response: Response & { body: BidData[] }) => {
-    //         expect(response.body).toHaveLength(0);
-    //       });
-    //   });
-    //
-    //   it('offset works', () => {
-    //     return request(app.getHttpServer())
-    //       .get('/bids?offset=1')
-    //       .expect(200)
-    //       .expect((response: Response & { body: BidData[] }) => {
-    //         expect(response.body).toHaveLength(0);
-    //       });
-    //   });
-    // });
-    //
-    // describe('/my', () => {
-    //   it('invalid username', () => {
-    //     return request(app.getHttpServer())
-    //       .get('/bids/my?username=INVALID')
-    //       .expect(401);
-    //   });
-    //
-    //   it('invalid query', () => {
-    //     return request(app.getHttpServer())
-    //       .get('/bids/my?usernama=INVALID&limit=-1')
-    //       .expect(400);
-    //   });
-    //
-    //   it('shows open', () => {
-    //     return request(app.getHttpServer())
-    //       .get(`/bids/my?username=${config.avitoEmpUser}`)
-    //       .expect(200)
-    //       .expect((response: Response & { body: BidData[] }) => {
-    //         expect(response.body).toHaveLength(1);
-    //       });
-    //   });
-    //
-    //   it('shows closed', () => {
-    //     return request(app.getHttpServer())
-    //       .get(`/bids/my?username=${config.yandexEmpUser}`)
-    //       .expect(200)
-    //       .expect((response: Response & { body: BidData[] }) => {
-    //         expect(response.body).toHaveLength(1);
-    //         expect(response.body[0].tenderId).toBe(tenderConfig.yandexTenderId);
-    //       });
-    //   });
-    //
-    //   it('limit works', () => {
-    //     return request(app.getHttpServer())
-    //       .get(`/bids/my?username=${config.yandexEmpUser}&limit=0`)
-    //       .expect(200)
-    //       .expect((response: Response & { body: BidData[] }) => {
-    //         expect(response.body).toHaveLength(0);
-    //       });
-    //   });
-    //
-    //   it('offset works', () => {
-    //     return request(app.getHttpServer())
-    //       .get(`/bids/my?username=${config.yandexEmpUser}&offset=1`)
-    //       .expect(200)
-    //       .expect((response: Response & { body: BidData[] }) => {
-    //         expect(response.body).toHaveLength(0);
-    //       });
-    //   });
-    //
-    //   it('offset works', () => {
-    //     return request(app.getHttpServer())
-    //       .get(`/bids/my?username=${config.yandexEmpUser}&offset=1`)
-    //       .expect(200)
-    //       .expect((response: Response & { body: BidData[] }) => {
-    //         expect(response.body).toHaveLength(0);
-    //       });
-    //   });
-    // });
-    //
+    describe('/my', () => {
+      it('invalid username', () => {
+        return request(app.getHttpServer())
+          .get('/bids/my?username=INVALID')
+          .expect(401);
+      });
+
+      it('invalid query', () => {
+        return request(app.getHttpServer())
+          .get('/bids/my?usernama=INVALID&limit=-1')
+          .expect(400);
+      });
+
+      it('shows bids', () => {
+        return request(app.getHttpServer())
+          .get(`/bids/my?username=${config.yandexEmpUser}`)
+          .expect(200)
+          .expect((response: Response & { body: BidData[] }) => {
+            expect(response.body).toHaveLength(1);
+          });
+      });
+
+      it('only shows real bids (not "saved")', () => {
+        return request(app.getHttpServer())
+          .get(`/bids/my?username=${config.avitoEmpUser}`)
+          .expect(200)
+          .expect((response: Response & { body: BidData[] }) => {
+            expect(response.body).toHaveLength(1);
+          });
+      });
+
+      it('limit works', () => {
+        return request(app.getHttpServer())
+          .get(`/bids/my?username=${config.yandexEmpUser}&limit=0`)
+          .expect(200)
+          .expect((response: Response & { body: BidData[] }) => {
+            expect(response.body).toHaveLength(0);
+          });
+      });
+
+      it('offset works', () => {
+        return request(app.getHttpServer())
+          .get(`/bids/my?username=${config.yandexEmpUser}&offset=1`)
+          .expect(200)
+          .expect((response: Response & { body: BidData[] }) => {
+            expect(response.body).toHaveLength(0);
+          });
+      });
+    });
+
+    describe('/:tenderId/list', () => {
+      it('invalid username', () => {
+        return request(app.getHttpServer())
+          .get(`/bids/${tenderConfig.avitoTenderId}/list?username=INVALID`)
+          .expect(401);
+      });
+
+      it('invalid query', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${tenderConfig.avitoTenderId}/list?usernama=INVALID&offset=-1`,
+          )
+          .expect(400);
+      });
+
+      it('user not responsible', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${tenderConfig.avitoTenderId}/list?username=${config.yandexEmpUser}`,
+          )
+          .expect(403);
+      });
+
+      it('shows published bids', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${tenderConfig.avitoTenderId}/list?username=${config.avitoEmpUser}`,
+          )
+          .expect(200)
+          .expect((response: Response & { body: BidData[] }) => {
+            expect(response.body).toHaveLength(1);
+          });
+      });
+
+      it('does not show unpublished bids', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${tenderConfig.yandexTenderId}/list?username=${config.yandexEmpUser}`,
+          )
+          .expect(200)
+          .expect((response: Response & { body: BidData[] }) => {
+            expect(response.body).toHaveLength(0);
+          });
+      });
+
+      it('limit works', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${tenderConfig.avitoTenderId}/list?username=${config.avitoEmpUser}&limit=0`,
+          )
+          .expect(200)
+          .expect((response: Response & { body: BidData[] }) => {
+            expect(response.body).toHaveLength(0);
+          });
+      });
+
+      it('offset works', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${tenderConfig.avitoTenderId}/list?username=${config.avitoEmpUser}&offset=1`,
+          )
+          .expect(200)
+          .expect((response: Response & { body: BidData[] }) => {
+            expect(response.body).toHaveLength(0);
+          });
+      });
+    });
+
     // describe('/:bidId/status', () => {
     //   it('invalid request', () => {
     //     return request(app.getHttpServer())
