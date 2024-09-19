@@ -13,7 +13,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../src/prisma.service';
 import { TenderData } from 'src/tenders/tenders.service';
-import { BidData } from 'src/bids/bids.service';
+import { BidData, FeedbackData } from 'src/bids/bids.service';
 
 interface TestConfig {
   avitoEmpId: string;
@@ -1241,6 +1241,113 @@ describe('AppController (e2e)', () => {
             bidFeedback: 'lalala',
           })
           .expect(403);
+      });
+
+      it('success', async () => {
+        await request(app.getHttpServer())
+          .put(`/bids/${bidConfig.avitoBidId}/feedback`)
+          .send({
+            username: config.yandexEmpUser,
+            bidFeedback: 'lalalalu',
+          })
+          .expect(200);
+
+        const feedback = await prisma.feedback.findFirst({
+          where: {
+            bidId: bidConfig.avitoBidId,
+          },
+        });
+        expect(feedback).not.toBeNull();
+        expect(feedback.message).toBe('lalalalu');
+      });
+    });
+
+    describe('/:tenderId/reviews', () => {
+      beforeEach(async () => {
+        await prisma.feedback.deleteMany();
+        await prisma.feedback.create({
+          data: {
+            bidId: bidConfig.avitoBidId,
+            message: 'lalalalu',
+            creatorId: config.yandexEmpId,
+          },
+        });
+      });
+
+      it('invalid request', () => {
+        return request(app.getHttpServer())
+          .get(`/bids/INVALID/reviews`)
+          .send({})
+          .expect(400);
+      });
+
+      it('invalid bid', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${config.yandexEmpId}/reviews?requesterUsername=${config.avitoEmpUser}&authorUsername=${config.yandexEmpUser}`,
+          )
+          .expect(404);
+      });
+
+      it('invalid user', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${tenderConfig.avitoTenderId}/reviews?requesterUsername=INVALID&authorUsername=${config.yandexEmpUser}`,
+          )
+          .expect(401);
+      });
+
+      it('insufficient rights', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${tenderConfig.avitoTenderId}/reviews?requesterUsername=${config.yandexEmpUser}&authorUsername=${config.yandexEmpUser}`,
+          )
+          .expect(403);
+      });
+
+      it('success', async () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${tenderConfig.avitoTenderId}/reviews?requesterUsername=${config.avitoEmpUser}&authorUsername=${config.yandexEmpUser}`,
+          )
+          .expect(200)
+          .expect((response: Response & { body: FeedbackData[] }) => {
+            expect(response.body).toHaveLength(1);
+            expect(response.body[0].message).toBe('lalalalu');
+          });
+      });
+
+      it('authorUsername filter works', async () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${tenderConfig.avitoTenderId}/reviews?requesterUsername=${config.avitoEmpUser}&authorUsername=${config.avitoEmpUser}`,
+          )
+          .expect(200)
+          .expect((response: Response & { body: FeedbackData[] }) => {
+            expect(response.body).toHaveLength(0);
+          });
+      });
+
+      it('limit works', async () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${tenderConfig.avitoTenderId}/reviews?requesterUsername=${config.avitoEmpUser}&authorUsername=${config.yandexEmpUser}&limit=0`,
+          )
+          .expect(200)
+          .expect((response: Response & { body: FeedbackData[] }) => {
+            expect(response.body).toHaveLength(0);
+          });
+      });
+
+      it('offset works', async () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${tenderConfig.avitoTenderId}/reviews?requesterUsername=${config.avitoEmpUser}&authorUsername=${config.yandexEmpUser}&offset=1`,
+          )
+          .expect(200)
+          .expect((response: Response & { body: FeedbackData[] }) => {
+            expect(response.body).toHaveLength(0);
+          });
       });
     });
   });

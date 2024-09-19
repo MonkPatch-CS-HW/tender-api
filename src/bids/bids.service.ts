@@ -203,12 +203,18 @@ export class BidsService {
     });
   }
 
-  async reviews(data: ReviewsData): Promise<FeedbackData[]> {
+  async reviews(
+    data: ReviewsData,
+    limit: number = 0,
+    offset: number = 0,
+  ): Promise<FeedbackData[]> {
     const feedbacks = await this.prisma.feedback.findMany({
       where: {
         bid: { tenderId: data.tenderId },
         creatorId: data.authorId,
       },
+      take: limit,
+      skip: offset,
     });
 
     return feedbacks;

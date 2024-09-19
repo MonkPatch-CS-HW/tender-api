@@ -33,9 +33,6 @@ class QueryReviews {
 
   @IsNotEmpty()
   requesterUsername: string;
-
-  @IsUUID()
-  tenderId: string;
 }
 
 class QueryBidsMy {
@@ -388,8 +385,11 @@ export class BidsController {
   }
 
   @Get(':tenderId/reviews')
-  async reviews(@Query() query: QueryReviews): Promise<FeedbackData[]> {
-    const tender = await this.tendersService.getById(query.tenderId);
+  async reviews(
+    @Param('tenderId', ParseUUIDPipe) tenderId: string,
+    @Query() query: QueryReviews,
+  ): Promise<FeedbackData[]> {
+    const tender = await this.tendersService.getById(tenderId);
     if (tender === null) throw new NotFoundException('Tender is not found');
 
     const employee = await this.employeesService.getByUsername(
@@ -402,18 +402,21 @@ export class BidsController {
     const author = await this.employeesService.getByUsername(
       query.authorUsername,
     );
-    if (!author)
-      throw new UnauthorizedException('Employee-author is not found');
+    if (!author) throw new NotFoundException('Employee-author is not found');
 
     if (!employee.organizationIds.includes(tender.organizationId))
       throw new ForbiddenException(
         'Employee is not responsible for organization',
       );
 
-    return await this.bidsService.reviews({
-      authorId: author.id,
-      tenderId: query.tenderId,
-    });
+    return await this.bidsService.reviews(
+      {
+        authorId: author.id,
+        tenderId: tenderId,
+      },
+      query.limit,
+      query.offset,
+    );
   }
 
   @Put(':bidId/submit_decision')
