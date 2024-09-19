@@ -301,6 +301,8 @@ export class BidsController {
     if (tender === null) throw new NotFoundException('Tender is not found');
 
     const employee = await this.employeesService.getByUsername(username, true);
+    if (employee === null)
+      throw new UnauthorizedException('Username not correct');
 
     switch (bid.authorType) {
       case 'Organization':
@@ -308,11 +310,11 @@ export class BidsController {
           throw new ForbiddenException(
             'User is not responsible for the organization',
           );
-
-        if (tender.organizationId) break;
+        break;
       case 'User':
         if (bid.authorId !== employee.id)
           throw new ForbiddenException('Incorrect user');
+        break;
     }
 
     return await this.bidsService.edit(bidId, data);
@@ -331,6 +333,8 @@ export class BidsController {
     if (tender === null) throw new NotFoundException('Tender is not found');
 
     const employee = await this.employeesService.getByUsername(username, true);
+    if (employee === null)
+      throw new UnauthorizedException('Username not correct');
 
     switch (bid.authorType) {
       case 'Organization':
@@ -338,11 +342,11 @@ export class BidsController {
           throw new ForbiddenException(
             'User is not responsible for the organization',
           );
-
-        if (tender.organizationId) break;
+        break;
       case 'User':
         if (bid.authorId !== employee.id)
           throw new ForbiddenException('Incorrect user');
+        break;
     }
 
     return await this.bidsService.rollback(bidId, version);
@@ -360,6 +364,8 @@ export class BidsController {
       data.username,
       true,
     );
+    if (employee === null)
+      throw new UnauthorizedException('Username not correct');
 
     switch (bid.authorType) {
       case 'Organization':
@@ -367,11 +373,11 @@ export class BidsController {
           throw new ForbiddenException(
             'User is not responsible for the organization',
           );
-
-        if (tender.organizationId) break;
+        break;
       case 'User':
         if (bid.authorId !== employee.id)
           throw new ForbiddenException('Incorrect user');
+        break;
     }
 
     return await this.bidsService.feedback({

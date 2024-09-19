@@ -92,6 +92,7 @@ async function initBids(
           tenderId: tenderConfig.avitoTenderId,
           name: 'Yandex Bid for Avito Tender',
           description: 'v2',
+          version: 2,
           authorType: bidAuthorType.Organization,
           authorId: config.yandexOrgId,
           creatorId: config.yandexEmpId,
@@ -116,7 +117,7 @@ async function initBids(
       authorId: config.yandexOrgId,
       creatorId: config.yandexEmpId,
       status: bidStatus.Published,
-      originalId: yandexBidId,
+      originalId: avitoBidId,
     },
   });
 
@@ -1025,88 +1026,100 @@ describe('AppController (e2e)', () => {
         expect(bid.status).toBe(bidStatus.Canceled);
       });
     });
-    //
-    // describe('/:bidId/edit', () => {
-    //   it('invalid request', () => {
-    //     return request(app.getHttpServer())
-    //       .patch(`/bids/INVALID/edit?username=${config.avitoEmpUser}`)
-    //       .send({})
-    //       .expect(400);
-    //   });
-    //
-    //   it('invalid bid', () => {
-    //     return request(app.getHttpServer())
-    //       .patch(
-    //         `/bids/${config.yandexEmpId}/edit?username=${config.avitoEmpUser}`,
-    //       )
-    //       .send({
-    //         name: 'Avito Bid',
-    //         description: 'v3',
-    //       })
-    //       .expect(404);
-    //   });
-    //
-    //   it('invalid user', () => {
-    //     return request(app.getHttpServer())
-    //       .patch(`/bids/${bidConfig.avitoBidId}/edit?username=INVALID`)
-    //       .send({
-    //         name: 'Avito Bid',
-    //         description: 'v3',
-    //       })
-    //       .expect(401);
-    //   });
-    //
-    //   it('insufficient rights', () => {
-    //     return request(app.getHttpServer())
-    //       .patch(
-    //         `/bids/${bidConfig.avitoBidId}/edit?username=${config.yandexEmpUser}`,
-    //       )
-    //       .send({
-    //         name: 'Avito Bid',
-    //         description: 'v3',
-    //       })
-    //       .expect(403);
-    //   });
-    //
-    //   it('edits correctly', async () => {
-    //     const response = await request(app.getHttpServer())
-    //       .patch(
-    //         `/bids/${bidConfig.avitoBidId}/edit?username=${config.avitoEmpUser}`,
-    //       )
-    //       .send({
-    //         name: 'Avito Bid',
-    //         description: 'v3',
-    //       })
-    //       .expect(200);
-    //
-    //     expect(response.body.version).toBe(3);
-    //     expect(response.body.description).toBe('v3');
-    //
-    //     const previousVersionsCount = await prisma.bid.count({
-    //       where: { originalId: bidConfig.avitoBidId },
-    //     });
-    //     expect(previousVersionsCount).toBe(2);
-    //
-    //     const currentBid = await prisma.bid.findFirst({
-    //       where: {
-    //         id: bidConfig.avitoBidId,
-    //       },
-    //     });
-    //
-    //     expect(currentBid).not.toBeNull();
-    //     expect(currentBid.description).toBe('v3');
-    //
-    //     const savedBid = await prisma.bid.findFirst({
-    //       where: {
-    //         originalId: bidConfig.avitoBidId,
-    //         version: 2,
-    //       },
-    //     });
-    //
-    //     expect(savedBid).not.toBeNull();
-    //     expect(savedBid.description).toBe('v2');
-    //   });
-    // });
+
+    describe('/:bidId/edit', () => {
+      it('invalid request', () => {
+        return request(app.getHttpServer())
+          .patch(`/bids/INVALID/edit?username=${config.avitoEmpUser}`)
+          .send({})
+          .expect(400);
+      });
+
+      it('invalid bid', () => {
+        return request(app.getHttpServer())
+          .patch(
+            `/bids/${config.yandexEmpId}/edit?username=${config.avitoEmpUser}`,
+          )
+          .send({
+            name: 'Avito Bid',
+            description: 'v3',
+          })
+          .expect(404);
+      });
+
+      it('invalid user', () => {
+        return request(app.getHttpServer())
+          .patch(`/bids/${bidConfig.avitoBidId}/edit?username=INVALID`)
+          .send({
+            name: 'Avito Bid',
+            description: 'v3',
+          })
+          .expect(401);
+      });
+
+      it('insufficient rights author organization', () => {
+        return request(app.getHttpServer())
+          .patch(
+            `/bids/${bidConfig.avitoBidId}/edit?username=${config.avitoEmpUser}`,
+          )
+          .send({
+            name: 'Avito Bid',
+            description: 'v3',
+          })
+          .expect(403);
+      });
+
+      it('insufficient rights author user', () => {
+        return request(app.getHttpServer())
+          .patch(
+            `/bids/${bidConfig.yandexBidId}/edit?username=${config.yandexEmpUser}`,
+          )
+          .send({
+            name: 'Avito Bid',
+            description: 'v3',
+          })
+          .expect(403);
+      });
+
+      it('edits correctly', async () => {
+        const response = await request(app.getHttpServer())
+          .patch(
+            `/bids/${bidConfig.avitoBidId}/edit?username=${config.yandexEmpUser}`,
+          )
+          .send({
+            name: 'Yandex Bid for Avito Tender',
+            description: 'v3',
+          })
+          .expect(200);
+
+        expect(response.body.version).toBe(3);
+        expect(response.body.description).toBe('v3');
+
+        const previousVersionsCount = await prisma.bid.count({
+          where: { originalId: bidConfig.avitoBidId },
+        });
+        expect(previousVersionsCount).toBe(2);
+
+        const currentBid = await prisma.bid.findFirst({
+          where: {
+            id: bidConfig.avitoBidId,
+          },
+        });
+
+        expect(currentBid).not.toBeNull();
+        expect(currentBid.description).toBe('v3');
+
+        const savedBid = await prisma.bid.findFirst({
+          where: {
+            originalId: bidConfig.avitoBidId,
+            version: 2,
+          },
+        });
+
+        expect(savedBid).not.toBeNull();
+        expect(savedBid.description).toBe('v2');
+      });
+    });
     //
     // describe('/:bidId/rollback', () => {
     //   it('invalid request', () => {
