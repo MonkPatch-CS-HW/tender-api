@@ -1194,5 +1194,54 @@ describe('AppController (e2e)', () => {
         expect(savedBid.description).toBe('v2');
       });
     });
+
+    describe('/:bidId/feedback', () => {
+      it('invalid request', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/INVALID/feedback`)
+          .send({})
+          .expect(400);
+      });
+
+      it('invalid bid', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${config.yandexEmpId}/feedback`)
+          .send({
+            username: config.avitoEmpUser,
+            bidFeedback: 'lalala',
+          })
+          .expect(404);
+      });
+
+      it('invalid user', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${bidConfig.avitoBidId}/feedback`)
+          .send({
+            username: 'INVALID',
+            bidFeedback: 'lalala',
+          })
+          .expect(401);
+      });
+
+      it('insufficient rights author organization', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${bidConfig.avitoBidId}/feedback`)
+          .send({
+            username: config.avitoEmpUser,
+            bidFeedback: 'lalala',
+          })
+          .expect(403);
+      });
+
+      it('insufficient rights author user', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${bidConfig.yandexBidId}/feedback`)
+          .send({
+            username: config.yandexEmpUser,
+            bidFeedback: 'lalala',
+          })
+          .expect(403);
+      });
+    });
   });
 });

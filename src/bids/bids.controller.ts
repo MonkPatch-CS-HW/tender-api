@@ -110,9 +110,6 @@ class BidFeedbackBody {
   @IsNotEmpty()
   bidFeedback: string;
 
-  @IsUUID()
-  bidId: string;
-
   @IsNotEmpty()
   username: string;
 }
@@ -353,8 +350,11 @@ export class BidsController {
   }
 
   @Put(':bidId/feedback')
-  async feedback(@Body() data: BidFeedbackBody) {
-    const bid = await this.bidsService.getById(data.bidId, true);
+  async feedback(
+    @Param('bidId', ParseUUIDPipe) bidId: string,
+    @Body() data: BidFeedbackBody,
+  ) {
+    const bid = await this.bidsService.getById(bidId, true);
     if (bid === null) throw new NotFoundException('Bid is not found');
 
     const tender = await this.tendersService.getById(bid.tenderId);
@@ -381,7 +381,7 @@ export class BidsController {
     }
 
     return await this.bidsService.feedback({
-      bidId: data.bidId,
+      bidId: bidId,
       message: data.bidFeedback,
       creatorId: employee.id,
     });
