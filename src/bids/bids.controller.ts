@@ -78,7 +78,7 @@ class BidCreateBody {
   creatorUsername: string;
 }
 
-enum bidDecision {
+export enum bidDecision {
   Approved,
   Rejected,
 }
@@ -86,9 +86,6 @@ enum bidDecision {
 class SubmitBody {
   @IsEnum(bidDecision)
   decision: bidDecision;
-
-  @IsUUID()
-  bidId: string;
 
   @IsNotEmpty()
   username: string;
@@ -420,8 +417,11 @@ export class BidsController {
   }
 
   @Put(':bidId/submit_decision')
-  async submit(@Body() data: SubmitBody): Promise<BidData> {
-    const bid = await this.bidsService.getById(data.bidId, true);
+  async submit(
+    @Param('bidId', ParseUUIDPipe) bidId: string,
+    @Body() data: SubmitBody,
+  ): Promise<BidData> {
+    const bid = await this.bidsService.getById(bidId, true);
     if (bid === null) throw new NotFoundException('Bid is not found');
 
     const tender = await this.tendersService.getById(bid.tenderId);
@@ -431,19 +431,15 @@ export class BidsController {
       data.username,
       true,
     );
+    if (employee === null)
+      throw new UnauthorizedException('Username not correct');
 
-    switch (bid.authorType) {
-      case 'Organization':
-        if (!employee.organizationIds.includes(bid.authorId))
-          throw new ForbiddenException(
-            'User is not responsible for the organization',
-          );
+    if (!employee.organizationIds.includes(tender.organizationId))
+      throw new ForbiddenException(
+        'User is not responsible for tender organization',
+      );
 
-        if (tender.organizationId) break;
-      case 'User':
-        if (bid.authorId !== employee.id)
-          throw new ForbiddenException('Incorrect user');
-    }
+    console.log('givin...', { data });
 
     return bid;
   }

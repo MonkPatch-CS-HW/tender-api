@@ -12,8 +12,9 @@ import {
   tenderStatus,
 } from '@prisma/client';
 import { PrismaService } from '../src/prisma.service';
-import { TenderData } from 'src/tenders/tenders.service';
-import { BidData, FeedbackData } from 'src/bids/bids.service';
+import { TenderData } from '../src/tenders/tenders.service';
+import { BidData, FeedbackData } from '../src/bids/bids.service';
+import { bidDecision } from '../src/bids/bids.controller';
 
 interface TestConfig {
   avitoEmpId: string;
@@ -1348,6 +1349,54 @@ describe('AppController (e2e)', () => {
           .expect((response: Response & { body: FeedbackData[] }) => {
             expect(response.body).toHaveLength(0);
           });
+      });
+    });
+
+    describe('/:bidId/submit_decision', () => {
+      it('invalid request', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/INVALID/submit_decision?usernama=${config.avitoEmpUser}`)
+          .expect(400);
+      });
+
+      it('invalid bid', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${config.yandexEmpId}/submit_decision`)
+          .send({
+            username: config.avitoEmpUser,
+            decision: bidDecision.Approved,
+          })
+          .expect(404);
+      });
+
+      it('invalid user', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${bidConfig.avitoBidId}/submit_decision`)
+          .send({
+            username: 'INVALID',
+            decision: bidDecision.Approved,
+          })
+          .expect(401);
+      });
+
+      it('insufficient rights', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${bidConfig.yandexBidId}/submit_decision`)
+          .send({
+            username: config.avitoEmpUser,
+            decision: bidDecision.Approved,
+          })
+          .expect(403);
+      });
+
+      it('insufficient rights', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${bidConfig.avitoBidId}/submit_decision`)
+          .send({
+            username: config.avitoEmpUser,
+            decision: bidDecision.Approved,
+          })
+          .expect(200);
       });
     });
   });
