@@ -1,9 +1,18 @@
+# ВАЖНО
+
+- Я перестал выполнять работу 13.09, а затем 16 числа обнаружил, что реальный дедлайн не совпадает с дедлайном из описания :(
+- Версия на 13.09 находится в ветке `13-09-2024`
+- В этой ветке я лишь добавляю E2E-тесты (не успел до изначального дедлайна 13.09 23:59 сделать тесты в принципе, но саму API успел)
+- Кажется, что E2E-тесты упростят вам проверку, а для меня будет доп. практикой, поэтому решил продолжить их делать потихоньку после дедлайна
+- Enjoy & Have Fun
+- Чтобы инициализировать БД (включая сущности из README), можно запустить скрипт scripts/initdb.sh (поменяв возможно переменные некоторые)
+- На всякий случай еще можно прописать `npx prisma db push`
+- Я натыкался несколько раз на несостыковки в различных частях ТЗ, поэтому пришлось слегка импровизировать
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
 
   <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
     <p align="center">
@@ -29,7 +38,7 @@
 ## Project setup
 
 ```bash
-$ pnpm install
+pnpm install
 ```
 
 ## Compile and run the project
