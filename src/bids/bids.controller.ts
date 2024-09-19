@@ -117,6 +117,14 @@ class BidFeedbackBody {
   username: string;
 }
 
+export class BidPutStatusBody {
+  @IsEnum(bidStatus)
+  status: bidStatus;
+
+  @IsNotEmpty()
+  username: string;
+}
+
 @Controller('bids')
 export class BidsController {
   constructor(
@@ -227,6 +235,8 @@ export class BidsController {
     if (tender === null) throw new NotFoundException('Tender is not found');
 
     const employee = await this.employeesService.getByUsername(username, true);
+    if (employee === null)
+      throw new UnauthorizedException('Username not correct');
 
     switch (bid.authorType) {
       case 'Organization':
@@ -234,11 +244,11 @@ export class BidsController {
           throw new ForbiddenException(
             'User is not responsible for the organization',
           );
-
-        if (tender.organizationId) break;
+        break;
       case 'User':
         if (bid.authorId !== employee.id)
           throw new ForbiddenException('Incorrect user');
+        break;
     }
 
     return bid.status;
@@ -247,8 +257,7 @@ export class BidsController {
   @Put(':bidId/status')
   async setStatus(
     @Param('bidId', ParseUUIDPipe) bidId: string,
-    @Query('username') username: string,
-    @Query('status', new ParseEnumPipe(bidStatus)) status: bidStatus,
+    @Body() body: BidPutStatusBody,
   ): Promise<BidData> {
     const bid = await this.bidsService.getById(bidId, true);
     if (bid === null) throw new NotFoundException('Bid is not found');
@@ -256,7 +265,12 @@ export class BidsController {
     const tender = await this.tendersService.getById(bid.tenderId);
     if (tender === null) throw new NotFoundException('Tender is not found');
 
-    const employee = await this.employeesService.getByUsername(username, true);
+    const employee = await this.employeesService.getByUsername(
+      body.username,
+      true,
+    );
+    if (employee === null)
+      throw new UnauthorizedException('Username not correct');
 
     switch (bid.authorType) {
       case 'Organization':
@@ -264,14 +278,14 @@ export class BidsController {
           throw new ForbiddenException(
             'User is not responsible for the organization',
           );
-
-        if (tender.organizationId) break;
+        break;
       case 'User':
         if (bid.authorId !== employee.id)
           throw new ForbiddenException('Incorrect user');
+        break;
     }
 
-    return await this.bidsService.updateStatus(bidId, status);
+    return await this.bidsService.updateStatus(bidId, body.status);
   }
 
   @Patch(':bidId/edit')

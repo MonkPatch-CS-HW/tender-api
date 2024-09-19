@@ -904,79 +904,127 @@ describe('AppController (e2e)', () => {
       });
     });
 
-    // describe('/:bidId/status', () => {
-    //   it('invalid request', () => {
-    //     return request(app.getHttpServer())
-    //       .get(`/bids/INVALID/status?username=${config.avitoEmpUser}`)
-    //       .expect(400);
-    //   });
-    //
-    //   it('invalid bid', () => {
-    //     return request(app.getHttpServer())
-    //       .get(
-    //         `/bids/${config.yandexEmpId}/status?username=${config.avitoEmpUser}`,
-    //       )
-    //       .expect(404);
-    //   });
-    //
-    //   it('invalid user', () => {
-    //     return request(app.getHttpServer())
-    //       .get(`/bids/${bidConfig.avitoBidId}/status?username=INVALID`)
-    //       .expect(401);
-    //   });
-    //
-    //   it('insufficient rights', () => {
-    //     return request(app.getHttpServer())
-    //       .get(
-    //         `/bids/${bidConfig.avitoBidId}/status?username=${config.yandexEmpUser}`,
-    //       )
-    //       .expect(403);
-    //   });
-    //
-    //   it('correct get published', () => {
-    //     return request(app.getHttpServer())
-    //       .get(
-    //         `/bids/${bidConfig.avitoBidId}/status?username=${config.avitoEmpUser}`,
-    //       )
-    //       .expect(200)
-    //       .expect(bidStatus.Published);
-    //   });
-    //
-    //   it('correct get created', () => {
-    //     return request(app.getHttpServer())
-    //       .get(
-    //         `/bids/${bidConfig.yandexBidId}/status?username=${config.yandexEmpUser}`,
-    //       )
-    //       .expect(200)
-    //       .expect(bidStatus.Created);
-    //   });
-    //
-    //   it('invalid put request', () => {
-    //     return request(app.getHttpServer())
-    //       .put(`/bids/${bidConfig.yandexBidId}/status`)
-    //       .send({})
-    //       .expect(400);
-    //   });
-    //
-    //   it('valid put', async () => {
-    //     const response = await request(app.getHttpServer())
-    //       .put(`/bids/${bidConfig.yandexBidId}/status`)
-    //       .send({
-    //         username: config.yandexEmpUser,
-    //         status: bidStatus.Canceled,
-    //       })
-    //       .expect(200);
-    //
-    //     expect(response.body).not.toBeNull();
-    //     expect(response.body.status).toBe(bidStatus.Canceled);
-    //
-    //     const bid = await prisma.bid.findFirst({
-    //       where: { id: bidConfig.yandexBidId },
-    //     });
-    //     expect(bid).not.toBeNull();
-    //     expect(bid.status).toBe(bidStatus.Canceled);
-    //   });
-    // });
+    describe('/:bidId/status', () => {
+      it('invalid request', () => {
+        return request(app.getHttpServer())
+          .get(`/bids/INVALID/status?usernama=${config.avitoEmpUser}`)
+          .expect(400);
+      });
+
+      it('invalid bid', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${config.yandexEmpId}/status?username=${config.avitoEmpUser}`,
+          )
+          .expect(404);
+      });
+
+      it('invalid user', () => {
+        return request(app.getHttpServer())
+          .get(`/bids/${bidConfig.avitoBidId}/status?username=INVALID`)
+          .expect(401);
+      });
+
+      it('insufficient rights for author organization', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${bidConfig.avitoBidId}/status?username=${config.avitoEmpUser}`,
+          )
+          .expect(403);
+      });
+
+      it('insufficient rights for author organization', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${bidConfig.yandexBidId}/status?username=${config.yandexEmpUser}`,
+          )
+          .expect(403);
+      });
+
+      it('correct get published', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${bidConfig.avitoBidId}/status?username=${config.yandexEmpUser}`,
+          )
+          .expect(200)
+          .expect(bidStatus.Published);
+      });
+
+      it('correct get created', () => {
+        return request(app.getHttpServer())
+          .get(
+            `/bids/${bidConfig.yandexBidId}/status?username=${config.avitoEmpUser}`,
+          )
+          .expect(200)
+          .expect(bidStatus.Created);
+      });
+
+      it('invalid put request', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${bidConfig.yandexBidId}/status`)
+          .send({})
+          .expect(400);
+      });
+
+      it('invalid put user', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${bidConfig.avitoBidId}/status`)
+          .send({
+            username: 'INVALID',
+            status: bidStatus.Canceled,
+          })
+          .expect(401);
+      });
+
+      it('incorrect put bid', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${config.yandexEmpId}/status`)
+          .send({
+            username: config.yandexEmpUser,
+            status: bidStatus.Canceled,
+          })
+          .expect(404);
+      });
+
+      it('insufficient put rights', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${bidConfig.avitoBidId}/status`)
+          .send({
+            username: config.avitoEmpUser,
+            status: bidStatus.Canceled,
+          })
+          .expect(403);
+      });
+
+      it('insufficient put rights', () => {
+        return request(app.getHttpServer())
+          .put(`/bids/${bidConfig.yandexBidId}/status`)
+          .send({
+            username: config.yandexEmpUser,
+            status: bidStatus.Canceled,
+          })
+          .expect(403);
+      });
+
+      it('valid put', async () => {
+        const response = await request(app.getHttpServer())
+          .put(`/bids/${bidConfig.yandexBidId}/status`)
+          .send({
+            username: config.avitoEmpUser,
+            status: bidStatus.Canceled,
+          })
+          .expect(200);
+
+        expect(response.body).not.toBeNull();
+        expect(response.body.status).toBe(bidStatus.Canceled);
+
+        const bid = await prisma.bid.findFirst({
+          where: { id: bidConfig.yandexBidId },
+        });
+        expect(bid).not.toBeNull();
+        expect(bid.status).toBe(bidStatus.Canceled);
+      });
+    });
     //
     // describe('/:bidId/edit', () => {
     //   it('invalid request', () => {
